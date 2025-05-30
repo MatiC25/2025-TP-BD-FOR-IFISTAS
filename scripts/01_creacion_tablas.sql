@@ -36,7 +36,6 @@ CREATE TABLE Item_Factura(
     item_f_precio DECIMAL(10, 2)
 )
 
-
 CREATE TABLE Direccion (
     direc_codigo INT IDENTITY(1,1), -- No sabemos si vamos a crear un codigo asociado a la direccion para no tener que comparar string
                                      -- con la direccion entre Sucursal, direccion y cliente || VARCHAR(100)

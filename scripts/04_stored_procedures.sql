@@ -7,19 +7,6 @@ CREATE TABLE Provincia(
 ALTER TABLE Provincia
 ADD CONSTRAINT PK_Provincia PRIMARY KEY (prov_codigo)
 
-/*
-SELECT DISTINCT prov_nombre
-    FROM (
-        SELECT Cliente_Provincia AS prov_nombre FROM GD1C2025.gd_esquema.Maestra
-        UNION
-        SELECT Proveedor_Provincia FROM gd_esquema.Maestra
-        UNION
-        SELECT Sucursal_Provincia FROM gd_esquema.Maestra
-    ) AS ProvinciasUnificadas
-*/
-    -- No hace falta poner el distinct, el union ya elimina los repetidos
-    -- No hace falta hacer los selects en el from, eso es casi ilegal según reino, es mejor hacer directamente 
-    -- la union con selects separados
 CREATE PROCEDURE Migracion_Provincia
 AS
 BEGIN
@@ -36,6 +23,11 @@ BEGIN
 		WHERE Sucursal_Provincia IS NOT NULL
 END;
 
+BEGIN TRANSACTION
+EXEC Migracion_Provincia
+ROLLBACK TRANSACTION
+COMMIT TRANSACTION
+
 
 CREATE TABLE Localidad (
     loca_codigo INT IDENTITY(1,1),
@@ -50,26 +42,6 @@ ADD CONSTRAINT PK_Localidad PRIMARY KEY (loca_codigo);
 -- FOREIGN KEY
 ALTER TABLE Localidad
 ADD CONSTRAINT FK_Localidad_Provincia FOREIGN KEY (loca_provincia) REFERENCES Provincia(prov_codigo);
-
-
-CREATE PROCEDURE Migracion_Localidad
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    INSERT INTO Localidad (loca_nombre, loca_provincia)
-    SELECT DISTINCT
-        loc.loca_nombre,
-        p.prov_codigo
-    FROM (
-        SELECT Cliente_Localidad AS loca_nombre, Cliente_Provincia AS prov_nombre FROM gd_esquema.Maestra
-        UNION
-        SELECT Proveedor_Localidad, Proveedor_Provincia FROM gd_esquema.Maestra
-        UNION
-        SELECT Sucursal_Localidad, Sucursal_Provincia FROM gd_esquema.Maestra
-    ) AS loc
-    JOIN Provincia p ON p.prov_nombre = loc.prov_nombre;
-END
 
 CREATE PROCEDURE Migracion_Localidad
 AS

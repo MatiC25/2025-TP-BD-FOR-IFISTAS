@@ -9,7 +9,7 @@
 
 -- == CLIENTE == --
 ALTER TABLE Cliente
-ADD CONSTRAINT PK_Cliente PRIMARY KEY (clie_codigo);
+ADD CONSTRAINT PK_Cliente PRIMARY KEY (clie_codigo)
 ADD CONSTRAINT FK_Cliente_Direccion FOREIGN KEY (clie_direccion) REFERENCES Direccion(direc_codigo);
 
 ADD CONSTRAINT uq_dni UNIQUE (clie_dni) -- El dni debe ser unico
@@ -116,7 +116,6 @@ ADD CONSTRAINT PK_Medida PRIMARY KEY (medi_codigo);
 ALTER TABLE Sillon_Material
 ADD CONSTRAINT FK_Sillon_Material FOREIGN KEY (sill_mate_codigo) REFERENCES Sillon(sill_codigo)
 ADD CONSTRAINT FK_Sillon_Material_Material FOREIGN KEY (sill_mate_material) REFERENCES Material(mate_codigo);
-
 
 -- == Material == -- 
 ALTER TABLE Material
