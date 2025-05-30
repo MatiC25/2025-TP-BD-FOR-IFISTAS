@@ -170,7 +170,7 @@ GO
 ALTER TABLE Cliente ADD CONSTRAINT FK_Cliente_Direccion FOREIGN KEY (clie_direccion)
 GO
 
-CREATE PROCEDURE Migracion_Cliente
+Migracion_Cliente
 AS
 BEGIN
     SET NOCOUNT ON
@@ -192,7 +192,7 @@ BEGIN
         tm.Cliente_Mail,
         tm.Cliente_Telefono,
         tm.Cliente_Dni
-    FROM gd_esquema.Maestra tm
+    FROM GD1C2025.gd_esquema.Maestra tm
     JOIN Direccion dir ON dir.dire_calle_altura = tm.Cliente_Direccion;
 
 END
@@ -200,3 +200,169 @@ GO
 
 EXEC Migracion_Cliente
 GO
+
+CREATE TABLE Envio(
+    envi_numero INT,
+    envi_fecha_programada DATETIME2,
+    envi_fecha_entrega DATETIME2, 
+    envi_importe_traslado DECIMAL(10, 2),
+    envi_importe_subida DECIMAL(10, 2)
+)
+GO
+
+ALTER Envio ADD CONSTRAINT PK_Envio PRIMARY KEY (envi_numero)
+GO
+
+CREATE PROCEDURE Migracion_Envio
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    INSERT INTO Envio (
+        envi_numero,
+        envi_fecha_programada,
+        envi_fecha_entrega,
+        envi_importe_traslado,
+        envi_importe_subida
+    )
+    SELECT DISTINCT
+        tm.Envio_Numero,
+        tm.Envio_Fecha_Programada,
+        tm.Envio_Fecha,
+        tm.Envio_ImporteTranslado,
+        tm.Envio_ImporteSubida
+        from GD1C2025.gd_esquema.Maestra tm
+END
+GO
+
+CREATE TABLE Sucursal( 
+    sucu_numero INT NOT NULL,
+    sucu_direccion INT,
+    sucu_telefono INT,
+    sucu_mail VARCHAR(100),
+)
+GO
+
+ALTER Sucursal ADD CONSTRAINT PK_Sucursal_Numero PRIMARY KEY (sucu_numero)
+GO
+
+CREATE PROCEDURE Migracion_Sucursal
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    INSERT INTO Sucursal(
+        sucu_numero,
+        sucu_direccion,
+        sucu_telefono,
+        sucu_mail
+    )
+    SELECT DISTINCT
+        tm.Sucursal_NroSucursal,
+        d.dire_codigo,
+        tm.Sucursal_telefono,
+        Sucursal_mail
+        from GD1C2025.gd_esquema.Maestra tm
+        JOIN Direccion d ON d.dire_calle_altura = m.Cliente_Direccion
+        JOIN Localidad l ON l.loca_codigo = d.dire_localidad
+        JOIN Provincia p ON p.prov_codigo = l.loca_provincia
+        AND p.prov_nombre = m.Cliente_Provincia
+        AND l.loca_nombre = m.Cliente_Localidad;
+GO
+
+-- ==================
+-- TABLA: Factura
+-- ==================   
+
+CREATE TABLE Factura( 
+    fact_numero INT,
+    fact_sucursal INT, -- CODIGO asociado a la sucursal || VARCHAR(50)
+    fact_cliente INT, -- CODIGO asociado al cliente || VARCHAR(50)
+    fact_total DECIMAL(10, 2),
+    fact_envio INT, -- Codigo asociado al envio
+    fact_fecha_hora DATETIME2, -- DATETIME
+)
+GO
+
+ALTER TABLE Factura ADD CONSTRAINT PK_Fact_Numero PRIMARY KEY (fact_numero)
+ADD CONSTRAINT PK_Fact_Sucursal PRIMARY KEY (fact_sucursal)
+GO
+
+ALTER TABLE Factura ADD CONSTRAINT FK_FACT_Envio FOREIGN KEY (fact_envio) REFERENCES Envio (envi_numero)
+ADD CONSTRAINT FK_Fact_cliente FOREIGN KEY (fact_cliente) REFERENCES Cliente (clie_codigo)
+GO
+
+CREATE PROCEDURE Migracion_Factura
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Factura(
+        fact_numero,
+        fact_sucursal, --> Numero de sucursal asociado
+        fact_cliente, --> Numero de cleinte asociado
+        fact_total,
+        fact_envio, --> Numero de Envio asociado
+        fact_fecha_hora
+    )
+    SELECT DISTINCT
+        tm.Factura_Numero,
+        s.sucu_numero,
+        c.clie_codigo,
+        tm.Factura_Total,
+        e.envi_numero,
+        tm.Factura_Fecha
+        FROM GD1C2025.gd_esquema.Maestra tm
+        LEFT JOIN Sucursal s on tm.Sucursal_NroSucursal = s.sucu_numero
+        JOIN Cliente c ON tm.Cliente_Dni = c.clie_dni 
+                        AND tm.Cliente_Nombre = c.clie_nombre 
+                        AND tm.Cliente_Nombre = c.clie_nombre
+        JOIN Envio e ON tm.Envio_Numero = e.envi_numero
+        WHERE tm.Factura_Numero IS NOT NULL
+END
+GO
+
+
+-- ==================
+-- TABLA: Estado
+-- ==================
+
+CREATE TABLE Estado (
+    esta_codigo INT IDENTITY(1,1),
+    esta_tipo VARCHAR(30) NOT NULL 
+)
+GO
+
+ALTER TABLE Estado ADD CONSTRAINT PK_Estado PRIMARY KEY (esta_codigo)
+GO 
+
+CREATE PROCEDURE Migracion_Estado
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO Estado (
+        esta_tipo 
+    )
+    SELECT 
+        tm.Pedido_Estado
+        FROM GD1C2025.gd_esquema.Maestra tm
+        WHERE tm.Pedido_Estado IS NOT NULL
+END
+GO
+
+-- ==================
+-- TABLA: Pedido
+-- ==================
+
+CREATE TABLE Pedido(
+    pedi_numero INT,
+    pedi_sucursal INT,
+    pedi_cliente INT,
+    pedi_fecha_hora DATETIME2,
+    pedi_total DECIMAL(10, 2),
+    pedi_estado VARCHAR(20) -- 'Pendiente', 'Enviado', 'Entregado', 'Cancelado'
+)
+GO
+
+ALTER TABLE ADD CONSTRAINT PRIMARY KEY

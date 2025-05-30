@@ -14,11 +14,20 @@
 > select DISTINCT  Proveedor_Localidad from GD1C2025.gd_esquema.Maestra
 ```
 
-#### Direcciones: 20269
+#### Direcciones: 20528
 ```
-> select DISTINCT Cliente_Direccion from GD1C2025.gd_esquema.Maestra
-> select DISTINCT Sucursal_Direccion from GD1C2025.gd_esquema.Maestra
-> select DISTINCT Proveedor_Direccion from GD1C2025.gd_esquema.Maestra
+SELECT DISTINCT Cliente_Direccion, Cliente_Localidad, Cliente_Provincia
+FROM GD1C2025.gd_esquema.Maestra
+WHERE Cliente_Direccion IS NOT NULL
+UNION
+SELECT DISTINCT Sucursal_Direccion, Sucursal_Localidad, Sucursal_Provincia
+FROM GD1C2025.gd_esquema.Maestra
+WHERE Sucursal_Direccion IS NOT NULL
+UNION
+SELECT DISTINCT Proveedor_Direccion, Proveedor_Localidad, Proveedor_Provincia
+FROM GD1C2025.gd_esquema.Maestra
+WHERE Proveedor_Direccion IS NOT NULL
+
 ```
 
 #### Cliente: 
