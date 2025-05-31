@@ -24,9 +24,11 @@
 > select DISTINCT Proveedor_Direccion from GD1C2025.gd_esquema.Maestra
 ```
 
-#### Cliente: 20510 
+#### Cliente: 20509
 ```sql
-> select DISTINCT Cliente_Nombre,Cliente_Apellido,Cliente_Dni from GD1C2025.gd_esquema.Maestra
+> select DISTINCT Cliente_Nombre,Cliente_Apellido,Cliente_Dni
+ from GD1C2025.gd_esquema.Maestra
+ where Cliente_Nombre is not null and Cliente_Apellido is not null and Cliente_Dni is not null
 ```
 
 #### Envios: 17408
@@ -47,12 +49,6 @@ where Envio_Numero is not null
 WHERE Factura_Numero  IS NOT NULL 
 ```
 
-#### Pedidos Estados: 280691
-```sql
-> SELECT Pedido_Estado FROM gd_esquema.Maestra
-WHERE Pedido_Estado IS NOT NULL
-```
-
 #### Pedidos : 20509
 ```sql
 > select DISTINCT Pedido_Numero FROM GD1C2025.gd_esquema.Maestra
@@ -71,15 +67,21 @@ where Pedido_Cancelacion_Motivo IS NOT NULL OR Pedido_Cancelacion_Motivo IS NOT 
 WHERE Proveedor_Cuit IS NOT NULL 
 ```
 
+#### Material : 9
+```sql
+> SELECT DISTINCT Material_Nombre FROM GD1C2025.gd_esquema.Maestra
+WHERE Material_Nombre IS NOT NULL
+```
+
 #### Madera : 2
 ```sql
-> SELECT DISTINCT Madera_Color FROM GD1C2025.gd_esquema.Maestra
+> SELECT DISTINCT Madera_Color, Madera_Dureza  FROM GD1C2025.gd_esquema.Maestra
 WHERE Madera_Color IS NOT NULL
 ```
 
 #### Tela : 3
 ```sql
-> SELECT DISTINCT Tela_Color FROM GD1C2025.gd_esquema.Maestra
+> SELECT DISTINCT Tela_Color, Tela_Textura FROM GD1C2025.gd_esquema.Maestra
 WHERE Tela_Color IS NOT NULL
 ```
 
@@ -87,12 +89,6 @@ WHERE Tela_Color IS NOT NULL
 ```sql
 > SELECT DISTINCT Relleno_Densidad FROM GD1C2025.gd_esquema.Maestra
 WHERE Relleno_Densidad IS NOT NULL
-```
-
-#### Material : 9
-```sql
-> SELECT DISTINCT Material_Nombre FROM GD1C2025.gd_esquema.Maestra
-WHERE Material_Nombre IS NOT NULL
 ```
 
 #### Modelo : 7
@@ -112,6 +108,36 @@ WHERE Sillon_Medida_Alto IS NOT NULL AND Sillon_Medida_Ancho IS NOT NULL AND Sil
 > SELECT DISTINCT Sillon_Codigo FROM GD1C2025.gd_esquema.Maestra
 WHERE Sillon_Codigo IS NOT NULL AND Sillon_Modelo_Codigo IS NOT NULL
 ```
+#### Sillon_Material : 216498
+```sql
+> SELECT Sillon_Codigo, Madera_Color, Madera_Dureza, Tela_Color, Tela_Textura, Relleno_Densidad FROM GD1C2025.gd_esquema.Maestra
+WHERE Sillon_Codigo IS NOT NULL
+```
+
+#### Compra : 79
+```sql
+> SELECT Distinct Compra_Numero FROM GD1C2025.gd_esquema.Maestra
+WHERE Compra_Numero IS NOT NULL
+```
+
+#### Item Compra : 711
+```sql
+> SELECT DISTINCT Compra_Numero, Compra_Fecha, Detalle_Compra_SubTotal, Detalle_Compra_Precio FROM GD1C2025.gd_esquema.Maestra
+WHERE Compra_Numero IS NOT NULL AND Detalle_Compra_Cantidad IS NOT NULL AND Compra_Fecha IS NOT NULL AND Detalle_Compra_SubTotal IS NOT NULLL
+```
+
+#### Item Pedida : 72166
+```sql
+> SELECT DISTINCT Pedido_Numero, Detalle_Pedido_Cantidad, Detalle_Pedido_Precio, Sillon_Codigo FROM GD1C2025.gd_esquema.Maestra
+WHERE Pedido_Numero IS NOT NULL AND Detalle_Pedido_Cantidad IS NOT NULL AND Detalle_Pedido_Precio IS NOT NULL AND Sillon_Codigo IS NOT NULL
+```
+
+#### Item Factura : 61228
+```sql
+> SELECT Distinct Factura_Numero FROM GD1C2025.gd_esquema.Maestra
+WHERE Factura_Numero IS NOT NULL 
+```
+
 ---
 ### 📌 Anotraciones extras 
 * 	Eliminamos los NULS ya que no tiene sentido que algunos campos sean NULL como:
@@ -138,6 +164,8 @@ WHERE Sillon_Codigo IS NOT NULL AND Sillon_Modelo_Codigo IS NOT NULL
     *   Sillon_Medida_Precio
     *   Sillon_Codigo
     *   Sillon_Modelo_Codigo
+    *   Decidimos eliminar la entidad estamos ya que, aunque nos parecía una buena practica para modelar, nos resultaba poco performante al momento de la implementacion
+    *    dado que nos obligaba a comparar VARCHARs lo que generaba mucho tiempo de consulta 
 
 
 

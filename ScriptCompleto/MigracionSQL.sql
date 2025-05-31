@@ -1,52 +1,17 @@
--- =========================
--- ELIMINAR SI EXISTE (SAFE)
--- =========================
-IF OBJECT_ID('Item_Factura') IS NOT NULL DROP TABLE Item_Factura;
-IF OBJECT_ID('Item_Pedido') IS NOT NULL DROP TABLE Item_Pedido;
-IF OBJECT_ID('Item_Compra') IS NOT NULL DROP TABLE Item_Compra;
-IF OBJECT_ID('Compra') IS NOT NULL DROP TABLE Compra;
-IF OBJECT_ID('Sillon_Material') IS NOT NULL DROP TABLE Sillon_Material;
-IF OBJECT_ID('Sillon') IS NOT NULL DROP TABLE Sillon;
-IF OBJECT_ID('Medida') IS NOT NULL DROP TABLE Medida;
-IF OBJECT_ID('Modelo') IS NOT NULL DROP TABLE Modelo;
-IF OBJECT_ID('Relleno') IS NOT NULL DROP TABLE Relleno;
-IF OBJECT_ID('Tela') IS NOT NULL DROP TABLE Tela;
-IF OBJECT_ID('Madera') IS NOT NULL DROP TABLE Madera;
-IF OBJECT_ID('Material') IS NOT NULL DROP TABLE Material;
-IF OBJECT_ID('Proveedor') IS NOT NULL DROP TABLE Proveedor;
-IF OBJECT_ID('Pedido_Cancelacion') IS NOT NULL DROP TABLE Pedido_Cancelacion;
-IF OBJECT_ID('Pedido') IS NOT NULL DROP TABLE Pedido;
-IF OBJECT_ID('Factura') IS NOT NULL DROP TABLE Factura;
-IF OBJECT_ID('Sucursal') IS NOT NULL DROP TABLE Sucursal;
-IF OBJECT_ID('Envio') IS NOT NULL DROP TABLE Envio;
-IF OBJECT_ID('Cliente') IS NOT NULL DROP TABLE Cliente;
-IF OBJECT_ID('Direccion') IS NOT NULL DROP TABLE Direccion;
-IF OBJECT_ID('Localidad') IS NOT NULL DROP TABLE Localidad;
-IF OBJECT_ID('Provincia') IS NOT NULL DROP TABLE Provincia;
-
-IF OBJECT_ID('Migracion_Direccion') IS NOT NULL DROP PROCEDURE Migracion_Direccion;
-IF OBJECT_ID('Migracion_Localidad') IS NOT NULL DROP PROCEDURE Migracion_Localidad;
-IF OBJECT_ID('Migracion_Provincia') IS NOT NULL DROP PROCEDURE Migracion_Provincia;
-IF OBJECT_ID('Migracion_Cliente') IS NOT NULL DROP PROCEDURE Migracion_Cliente;
-IF OBJECT_ID('Migracion_Envio') IS NOT NULL DROP PROCEDURE Migracion_Envio;
-IF OBJECT_ID('Migracion_Sucursal') IS NOT NULL DROP PROCEDURE Migracion_Sucursal;
-IF OBJECT_ID('Migracion_Factura') IS NOT NULL DROP PROCEDURE Migracion_Factura;
-IF OBJECT_ID('Migracion_Pedido') IS NOT NULL DROP PROCEDURE Migracion_Pedido;
-IF OBJECT_ID('Migracion_Pedido_Cancelacion') IS NOT NULL DROP PROCEDURE Migracion_Pedido_Cancelacion;
-IF OBJECT_ID('Migracion_Proveedor') IS NOT NULL DROP PROCEDURE Migracion_Proveedor;
-IF OBJECT_ID('Migracion_Madera') IS NOT NULL DROP PROCEDURE Migracion_Madera;
-IF OBJECT_ID('Migracion_Tela') IS NOT NULL DROP PROCEDURE Migracion_Tela;
-IF OBJECT_ID('Migracion_Relleno') IS NOT NULL DROP PROCEDURE Migracion_Relleno;
-IF OBJECT_ID('Migracion_Material') IS NOT NULL DROP PROCEDURE Migracion_Material;
-IF OBJECT_ID('Migracion_Modelo') IS NOT NULL DROP PROCEDURE Migracion_Modelo;
-IF OBJECT_ID('Migracion_Medida') IS NOT NULL DROP PROCEDURE Migracion_Medida;
-IF OBJECT_ID('Migracion_Sillon') IS NOT NULL DROP PROCEDURE Migracion_Sillon;
-IF OBJECT_ID('Migracion_Sillon_Material') IS NOT NULL DROP PROCEDURE Migracion_Sillon_Material;
-IF OBJECT_ID('Migracion_Compra') IS NOT NULL DROP PROCEDURE Migracion_Compra;
-IF OBJECT_ID('Migracion_Item_Compra') IS NOT NULL DROP PROCEDURE Migracion_Item_Compra;
-IF OBJECT_ID('Migracion_Item_Pedido') IS NOT NULL DROP PROCEDURE Migracion_Item_Pedido;
-IF OBJECT_ID('Migracion_Item_Factura') IS NOT NULL DROP PROCEDURE Migracion_Item_Factura;
+-- Crear la nueva base de datos
+IF EXISTS (SELECT name FROM sys.databases WHERE name = 'ForIfistas')
+BEGIN
+    DROP DATABASE ForIfistas;
+END
 GO
+
+CREATE DATABASE ForIfistas;
+GO
+
+-- Usar la base de datos recién creada
+USE ForIfistas;
+GO
+
 
 -- ==================
 -- TABLA: Provincia
@@ -987,6 +952,8 @@ GO
 EXEC Migracion_Item_Compra
 GO
 EXEC Migracion_Item_Pedido
+GO
+EXEC Migracion_Item_Factura
 GO
 EXEC Migracion_Item_Factura
 GO
