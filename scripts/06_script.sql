@@ -1,36 +1,17 @@
--- ========================================
--- 1. BORRADO DE ÍNDICES SI YA EXISTEN
--- ========================================
-IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Cliente_Dni_NombreApellido')
-    DROP INDEX IX_Cliente_Dni_NombreApellido ON Cliente;
-
-IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Estado_Tipo')
-    DROP INDEX IX_Estado_Tipo ON Estado;
-
-IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Sucursal_Numero')
-    DROP INDEX IX_Sucursal_Numero ON Sucursal;
-
-IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Maestra_Join')
-    DROP INDEX IX_Maestra_Join ON GD1C2025.gd_esquema.Maestra;
-
-
-IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Maestra_Optimizada')
-    DROP INDEX IX_Maestra_Optimizada ON GD1C2025.gd_esquema.Maestra;
-
-IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Estado_Tipo_Entregado')
-    DROP INDEX IX_Estado_Tipo_Entregado ON Estado;
-
-IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Estado_Tipo_Cancelado')
-    DROP INDEX IX_Estado_Tipo_Cancelado ON Estado;
-
-
-
 -- =========================
 -- ELIMINAR SI EXISTE (SAFE)
 -- =========================
 
+IF OBJECT_ID('Sillon') IS NOT NULL DROP TABLE Sillon;
+IF OBJECT_ID('Medida') IS NOT NULL DROP TABLE Medida;
+IF OBJECT_ID('Modelo') IS NOT NULL DROP TABLE Modelo;
+IF OBJECT_ID('Relleno') IS NOT NULL DROP TABLE Relleno;
+IF OBJECT_ID('Tela') IS NOT NULL DROP TABLE Tela;
+IF OBJECT_ID('Madera') IS NOT NULL DROP TABLE Madera;
+IF OBJECT_ID('Material') IS NOT NULL DROP TABLE Material;
+IF OBJECT_ID('Proveedor') IS NOT NULL DROP TABLE Proveedor;
+IF OBJECT_ID('Pedido_Cancelacion') IS NOT NULL DROP TABLE Pedido_Cancelacion;
 IF OBJECT_ID('Pedido') IS NOT NULL DROP TABLE Pedido;
-IF OBJECT_ID('Estado') IS NOT NULL DROP TABLE Estado;
 IF OBJECT_ID('Factura') IS NOT NULL DROP TABLE Factura;
 IF OBJECT_ID('Sucursal') IS NOT NULL DROP TABLE Sucursal;
 IF OBJECT_ID('Envio') IS NOT NULL DROP TABLE Envio;
@@ -46,9 +27,16 @@ IF OBJECT_ID('Migracion_Cliente') IS NOT NULL DROP PROCEDURE Migracion_Cliente;
 IF OBJECT_ID('Migracion_Envio') IS NOT NULL DROP PROCEDURE Migracion_Envio;
 IF OBJECT_ID('Migracion_Sucursal') IS NOT NULL DROP PROCEDURE Migracion_Sucursal;
 IF OBJECT_ID('Migracion_Factura') IS NOT NULL DROP PROCEDURE Migracion_Factura;
-IF OBJECT_ID('Migracion_Estado') IS NOT NULL DROP PROCEDURE Migracion_Estado;
 IF OBJECT_ID('Migracion_Pedido') IS NOT NULL DROP PROCEDURE Migracion_Pedido;
-
+IF OBJECT_ID('Migracion_Pedido_Cancelacion') IS NOT NULL DROP PROCEDURE Migracion_Pedido_Cancelacion;
+IF OBJECT_ID('Migracion_Proveedor') IS NOT NULL DROP PROCEDURE Migracion_Proveedor;
+IF OBJECT_ID('Migracion_Madera') IS NOT NULL DROP PROCEDURE Migracion_Madera;
+IF OBJECT_ID('Migracion_Tela') IS NOT NULL DROP PROCEDURE Migracion_Tela;
+IF OBJECT_ID('Migracion_Relleno') IS NOT NULL DROP PROCEDURE Migracion_Relleno;
+IF OBJECT_ID('Migracion_Material') IS NOT NULL DROP PROCEDURE Migracion_Material;
+IF OBJECT_ID('Migracion_Modelo') IS NOT NULL DROP PROCEDURE Migracion_Modelo;
+IF OBJECT_ID('Migracion_Medida') IS NOT NULL DROP PROCEDURE Migracion_Medida;
+IF OBJECT_ID('Migracion_Sillon') IS NOT NULL DROP PROCEDURE Migracion_Sillon;
 GO
 
 -- ==================
@@ -357,46 +345,17 @@ END
 GO
 
 
-
--- ==================
--- TABLA: Estado
--- ==================
-
-CREATE TABLE Estado (
-    esta_codigo INT IDENTITY(1,1),
-    esta_tipo VARCHAR(10) NOT NULL 
-)
-GO
-
-ALTER TABLE Estado ADD CONSTRAINT PK_Estado PRIMARY KEY (esta_codigo)
-GO 
-
-CREATE PROCEDURE Migracion_Estado
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    INSERT INTO Estado (
-        esta_tipo 
-    )
-    SELECT 
-        tm.Pedido_Estado
-        FROM GD1C2025.gd_esquema.Maestra tm
-        WHERE tm.Pedido_Estado IS NOT NULL
-END
-GO
-
 -- ==================
 -- TABLA: Pedido
 -- ==================
 
-CREATE TABLE Pedido(
+CREATE TABLE Pedido (
     pedi_numero INT NOT NULL,
     pedi_sucursal INT, --> codigo asociado a la Sucursal
     pedi_cliente INT, --> codigo asociado al Cliente
     pedi_fecha_hora DATETIME2,
     pedi_total DECIMAL(10, 2),
-    pedi_estado INT --> Codigo asociado al Estado
+    pedi_estado VARCHAR(10) --> Codigo asociado al Estado 
 )
 GO
 
@@ -404,20 +363,11 @@ ALTER TABLE Pedido ADD CONSTRAINT PK_Pedido_Numero PRIMARY KEY (pedi_numero)
 GO
 ALTER TABLE Pedido ADD CONSTRAINT FK_Pedido_Clinete FOREIGN KEY (pedi_cliente) REFERENCES Cliente(clie_codigo)
 GO
-ALTER TABLE Pedido ADD CONSTRAINT FK_Pedido_Estado FOREIGN KEY (pedi_estado) REFERENCES Estado(esta_codigo)
-GO
 
 CREATE PROCEDURE Migracion_Pedido
 AS
 BEGIN
-
     SET NOCOUNT ON;
-
-    ;WITH PedidosFiltrados AS (
-    SELECT *
-    FROM GD1C2025.gd_esquema.Maestra
-    WHERE Pedido_Numero IS NOT NULL
-)
 
     INSERT INTO Pedido (
         pedi_numero,
@@ -425,7 +375,7 @@ BEGIN
         pedi_cliente,
         pedi_fecha_hora,
         pedi_total,
-    -- pedi_estado
+        pedi_estado
     )
 
     SELECT DISTINCT
@@ -434,44 +384,353 @@ BEGIN
         c.clie_codigo,
         tm.Pedido_Fecha,
         tm.Pedido_Total,
-    --    e.esta_codigo
-    FROM PedidosFiltrados tm
+        tm.Pedido_Estado
+    FROM GD1C2025.gd_esquema.Maestra tm
     JOIN Cliente c ON tm.Cliente_Nombre = c.clie_nombre AND tm.Cliente_Apellido = c.clie_apellido AND tm.Cliente_Dni = c.clie_dni
-    --JOIN Estado e ON tm.Pedido_Estado = e.esta_tipo
     JOIN Sucursal s ON tm.Sucursal_NroSucursal = s.sucu_numero
     WHERE tm.Pedido_Numero IS NOT NULL
 END
 GO
 
--- ========================================
--- 2. CREACIÓN DE ÍNDICES PARA MIGRACIÓN
--- ========================================
+-- ==================
+-- TABLA: Pedido Cancelacion
+-- ==================
 
-CREATE NONCLUSTERED  INDEX IX_Cliente_Dni_NombreApellido 
-ON Cliente (clie_dni, clie_nombre, clie_apellido);
+CREATE TABLE Pedido_Cancelacion (
+    pedi_c_numero INT NOT NULL, -- Numero asociado al numero de pedido (pedi_numero)
+    pedi_c_fecha DATETIME2 NOT NULL,
+    pedi_c_motivo VARCHAR(255) NOT NULL
+) 
+GO
+ALTER TABLE Pedido_Cancelacion ADD CONSTRAINT FK_Pedido_Cancelacion_Numero FOREIGN KEY (pedi_c_numero) REFERENCES Pedido(pedi_numero)
+GO
+CREATE PROCEDURE Migracion_Pedido_Cancelacion
+AS
+BEGIN
+    SET NOCOUNT ON;
 
-CREATE NONCLUSTERED  INDEX IX_Estado_Tipo 
-ON Estado (esta_tipo);
+    INSERT INTO Pedido_Cancelacion (
+        pedi_c_numero,
+        pedi_c_fecha,
+        pedi_c_motivo
+    )
 
-CREATE NONCLUSTERED  INDEX IX_Sucursal_Numero 
-ON Sucursal (sucu_numero);
+    SELECT DISTINCT
+        p.pedi_numero,
+        tm.Pedido_Cancelacion_Fecha,
+        tm.Pedido_Cancelacion_Motivo
+        FROM GD1C2025.gd_esquema.Maestra tm
+        JOIN Pedido p on p.pedi_numero = tm.Pedido_Numero
+        WHERE tm.Pedido_Numero IS NOT NULL AND tm.Pedido_Cancelacion_Fecha IS NOT NULL AND tm.Pedido_Cancelacion_Motivo IS NOT NULL 
+END
+GO
 
-CREATE NONCLUSTERED INDEX IX_Estado_Tipo_Entregado
-ON Estado (esta_tipo)
-WHERE esta_tipo = 'ENTREGADO';
+-- ==================
+-- TABLA: Proveedor
+-- ==================
 
-CREATE NONCLUSTERED INDEX IX_Estado_Tipo_Cancelado
-ON Estado (esta_tipo)
-WHERE esta_tipo = 'CANCELADO';
+CREATE TABLE Proveedor(
+    prov_codigo INT IDENTITY(1,1),
+    prov_razon_social VARCHAR(100) NOT NULL,
+    prov_cuit VARCHAR(20), -- CUIT del proveedor
+    prov_direccion INT, -- CODIGO asiciado a la direccion || VARCHAR(50) TODO
+    prov_telefono INT,
+    prov_mail VARCHAR(100),
 
-CREATE NONCLUSTERED INDEX IX_Maestra_Optimizada 
-ON GD1C2025.gd_esquema.Maestra (
-    Pedido_Numero,                     -- utilizado en WHERE
-    Cliente_Dni, Cliente_Nombre, Cliente_Apellido,  -- JOIN con Cliente
-    Pedido_Estado,                    -- JOIN con Estado
-    Sucursal_NroSucursal              -- JOIN con Sucursal
 )
-INCLUDE (Pedido_Fecha, Pedido_Total); -- columnas del SELECT
+GO
+ALTER TABLE Proveedor ADD CONSTRAINT PK_Proveedor PRIMARY KEY(prov_codigo)
+GO
+ALTER TABLE Proveedor ADD CONSTRAINT FK_Proveedor FOREIGN KEY(prov_direccion) REFERENCES Direccion(dire_codigo)
+GO
+CREATE PROCEDURE Migracion_Proveedor
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Proveedor (
+        prov_razon_social,
+        prov_cuit,
+        prov_direccion,
+        prov_telefono,
+        prov_mail
+    )
+
+    SELECT DISTINCT 
+        tm.Proveedor_RazonSocial,
+        tm.Proveedor_Cuit,
+        d.dire_codigo,
+        tm.Proveedor_Telefono,
+        tm.Proveedor_Mail
+    FROM GD1C2025.gd_esquema.Maestra tm
+        JOIN Direccion d ON d.dire_calle_altura = tm.Proveedor_Direccion
+        JOIN Localidad l ON l.loca_codigo = d.dire_localidad
+        JOIN Provincia p ON p.prov_codigo = l.loca_provincia
+                            AND p.prov_nombre = tm.Proveedor_Provincia
+                            AND l.loca_nombre = tm.Proveedor_Localidad
+    WHERE tm.Proveedor_RazonSocial IS NOT NULL
+END
+GO
+
+-- ==================
+-- TABLA: Material
+-- ==================
+
+-- TODO: Ver como funciona el tema de la herencia hay que agregar uan FK para el tema de los poder entrar a el Material?? 
+CREATE TABLE Material(
+    mate_codigo INT IDENTITY(1,1),-- Codigo material
+    mate_nombre VARCHAR(100),
+    mate_descipcion VARCHAR(255),
+    mate_precio DECIMAL(10, 2),
+    mate_tipo VARCHAR(20)
+)
+GO
+
+ALTER TABLE Material ADD CONSTRAINT PK_Material_Codigo PRIMARY KEY (mate_codigo)
+GO
+
+CREATE PROCEDURE Migracion_Material
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Material(
+        mate_nombre,
+        mate_descipcion,
+        mate_precio,
+        mate_tipo
+    )
+    SELECT DISTINCT
+        tm.Material_Nombre,
+        tm.Material_Descripcion,
+        tm.Material_Precio,
+        tm.Material_Tipo
+        FROM GD1C2025.gd_esquema.Maestra tm
+        WHERE tm.Material_Nombre IS NOT NULL AND tm.Material_Tipo IS NOT NULL
+END
+GO
+
+
+-- ==================
+-- TABLA: Madera
+-- ==================
+
+CREATE TABLE Madera(
+    made_codigo INT NOT NULL,
+    made_tipo VARCHAR(20),
+    made_color VARCHAR(20),
+    made_dureza VARCHAR(20)
+)
+GO
+
+ALTER TABLE Madera ADD CONSTRAINT FK_Madera_Codigo FOREIGN KEY (made_codigo) REFERENCES Material (mate_codigo)
+GO
+
+CREATE PROCEDURE Migracion_Madera
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Madera(
+        made_codigo,
+        made_tipo,
+        made_color,
+        made_dureza      
+    )
+    SELECT DISTINCT
+        m.mate_codigo,
+        tm.Material_Tipo,
+        tm.Madera_Color,
+        tm.Madera_Dureza
+        FROM GD1C2025.gd_esquema.Maestra tm
+        JOIN Material m on tm.Material_Tipo = m.mate_tipo
+        WHERE tm.Madera_Color IS NOT NULL AND tm.Madera_Dureza IS NOT NULL
+END
+GO
+
+-- ==================
+-- TABLA: Tela
+-- ==================
+
+CREATE TABLE Tela(
+    tela_codigo INT NOT NULL,
+    tela_tipo VARCHAR(20),
+    tela_color VARCHAR(20),
+    tela_textura VARCHAR(20)
+)
+GO
+
+ALTER TABLE Tela ADD CONSTRAINT FK_Tela_Codigo FOREIGN KEY (tela_codigo) REFERENCES Material (mate_codigo)
+GO
+
+CREATE PROCEDURE Migracion_Tela
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Tela(
+        tela_codigo,
+        tela_tipo,
+        tela_color,
+        tela_textura
+    )
+    SELECT DISTINCT
+        m.mate_codigo,
+        tm.Material_Tipo,
+        tm.Tela_Color,
+        tm.Tela_Textura
+        FROM GD1C2025.gd_esquema.Maestra tm
+        join Material m on tm.Material_Tipo = m.mate_tipo
+        WHERE tm.Tela_Color IS NOT NULL AND tm.Tela_Textura IS NOT NULL
+END
+GO
+
+-- ==================
+-- TABLA: Relleno
+-- ==================
+
+CREATE TABLE Relleno(
+    rell_codigo INT NOT NULL,
+    rell_tipo VARCHAR(20),
+    rell_densidad DECIMAL(10,2)
+    )
+GO
+
+ALTER TABLE Relleno ADD CONSTRAINT PK_Relleno_Codigo FOREIGN KEY (rell_codigo) REFERENCES Material (mate_codigo)
+GO
+
+CREATE PROCEDURE Migracion_Relleno
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Relleno(
+        rell_codigo,
+        rell_tipo,
+        rell_densidad
+    )
+    SELECT DISTINCT
+        m.mate_codigo,
+        tm.Material_Tipo,
+        tm.Relleno_Densidad
+        FROM GD1C2025.gd_esquema.Maestra tm
+        join Material m on tm.material_tipo = m.mate_tipo
+        WHERE tm.Relleno_Densidad IS NOT NULL
+END
+GO
+
+
+-- ==================
+-- TABLA: Modelo
+-- ==================
+
+CREATE TABLE Modelo(
+    mode_code INT NOT NULL, -- Codigo asociado de sill_modelo_codigo
+    mode_descripcion VARCHAR(255)
+)
+GO
+
+ALTER TABLE Modelo ADD CONSTRAINT PK_Modelo PRIMARY KEY (mode_code)
+GO
+
+CREATE PROCEDURE Migracion_Modelo
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Modelo(
+        mode_code,
+        mode_descripcion
+    )
+    SELECT DISTINCT
+        tm.Sillon_Modelo_Codigo,
+        tm.Sillon_Modelo_Descripcion
+        FROM GD1C2025.gd_esquema.Maestra tm
+        WHERE tm.Sillon_Modelo_Codigo IS NOT NULL
+END
+GO
+
+-- ==================
+-- TABLA: Medidas
+-- ==================
+
+CREATE TABLE Medida(
+    medi_codigo INT IDENTITY(1,1),
+    medi_alto DECIMAL(10, 2),
+    medi_ancho DECIMAL(10, 2),
+    medi_profundo DECIMAL(10, 2),
+    medi_precio DECIMAL(10, 2)    
+)
+GO
+
+ALTER TABLE Medida ADD CONSTRAINT PK_Medida PRIMARY KEY (medi_codigo);
+GO 
+
+CREATE PROCEDURE Migracion_Medida
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Medida(
+        medi_alto,
+        medi_ancho,
+        medi_profundo,
+        medi_precio
+    )
+    SELECT DISTINCT
+        tm.Sillon_Medida_Alto,
+        tm.Sillon_Medida_Ancho,
+        tm.Sillon_Medida_Profundidad,
+        tm.Sillon_Medida_Precio
+        FROM GD1C2025.gd_esquema.Maestra tm
+        WHERE tm.Sillon_Medida_Alto IS NOT NULL AND tm.Sillon_Medida_Ancho IS NOT NULL AND tm.Sillon_Medida_Profundidad IS NOT NULL AND tm.Sillon_Medida_Precio IS NOT NULL
+END
+GO
+
+-- ==================
+-- TABLA: Sillon
+-- ==================
+
+CREATE TABLE Sillon(
+    sill_codigo INT NOT NULL,
+    sill_modelo INT, -- CODIGO MODELO
+    sill_medida INT -- CODIGO MEDIDAS (Auto Incremental)
+)
+GO
+-- == Sillon == -- 
+ALTER TABLE Sillon ADD CONSTRAINT PK_Sillon PRIMARY KEY (sill_codigo)
+GO
+ALTER TABLE Sillon ADD CONSTRAINT FK_Sillon_Modelo_Codigo FOREIGN KEY (sill_modelo) REFERENCES Modelo(mode_code)
+GO
+ALTER TABLE Sillon ADD CONSTRAINT FK_Sillon_Medida FOREIGN KEY (sill_medida) REFERENCES Medida(medi_codigo)
+GO
+
+CREATE PROCEDURE Migracion_Sillon
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Sillon(
+        sill_codigo,
+        sill_modelo,
+        sill_medida
+    )
+    SELECT DISTINCT
+        tm.Sillon_Codigo,
+        tm.Sillon_Modelo_Codigo,
+		m.medi_codigo
+        FROM GD1C2025.gd_esquema.Maestra tm
+        JOIN Medida m on tm.Sillon_Medida_Alto = m.medi_alto AND
+                         tm.Sillon_Medida_Ancho = m.medi_ancho AND
+                         tm.Sillon_Medida_Profundidad = m.medi_profundo AND
+                         tm.Sillon_Medida_Precio = m.medi_precio
+        WHERE tm.Sillon_Codigo IS NOT NULL AND tm.Sillon_Modelo_Codigo IS NOT NULL
+END
+GO
+
+-- ==================
+-- TABLA: Sillon_Material
+-- ==================
 
 -- ==================
 -- EJECUTAR MIGRACIONES
@@ -491,7 +750,23 @@ EXEC Migracion_Sucursal
 GO
 EXEC Migracion_Factura
 GO
-EXEC Migracion_Estado
-GO
 EXEC Migracion_Pedido
+GO
+EXEC Migracion_Pedido_Cancelacion
+GO
+EXEC Migracion_Proveedor
+GO
+EXEC Migracion_Material
+GO
+EXEC Migracion_Madera
+GO
+EXEC Migracion_Tela
+GO
+EXEC Migracion_Relleno
+GO
+EXEC Migracion_Modelo
+GO
+EXEC Migracion_Medida
+GO
+EXEC Migracion_Sillon
 GO

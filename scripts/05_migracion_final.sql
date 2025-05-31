@@ -361,8 +361,75 @@ CREATE TABLE Pedido(
     pedi_cliente INT,
     pedi_fecha_hora DATETIME2,
     pedi_total DECIMAL(10, 2),
-    pedi_estado VARCHAR(20) -- 'Pendiente', 'Enviado', 'Entregado', 'Cancelado'
+    pedi_estado VARCHAR(20) -- 'Entregado', 'Cancelado'
 )
 GO
 
-ALTER TABLE ADD CONSTRAINT PRIMARY KEY
+ALTER TABLE Pedido ADD CONSTRAINT PK_Pedido_Numero PRIMARY KEY (pedi_numero)
+GO
+ALTER TABLE Pedido ADD CONSTRAINT FK_Pedido_Clinete FOREIGN KEY (pedi_cliente) REFERENCES Cliente(clie_codigo)
+GO
+ALTER TABLE Pedido ADD CONSTRAINT FK_Pedido_Estado FOREIGN KEY (pedi_estado) REFERENCES Estado(esta_codigo)
+GO
+
+CREATE PROCEDURE Migracion_Pedido
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Pedido (
+        pedi_numero,
+        pedi_sucursal,
+        pedi_cliente,
+        pedi_fecha_hora,
+        pedi_total,
+        pedi_estado
+    )
+
+    SELECT 
+        tm.Pedido_Numero,
+        tm.Sucursal_NroSucursal,
+        c.clie_codigo,
+        tm.Pedido_Fecha,
+        tm.Pedido_Total,
+        e.esta_codigo
+    FROM GD1C2025.gd_esquema.Maestra tm
+    JOIN Cliente c ON tm.Cliente_Nombre+tm.Cliente_Apellido+tm.Cliente_Dni = c.clie_nombre+c.clie_apellido+c.clie_dni
+    JOIN Estado e ON tm.Pedido_Estado = e.esta_tipo
+    WHERE tm.Pedido_Numero IS NOT NULL
+END
+GO
+
+
+-- ==================
+-- TABLA: Pedido
+-- ==================
+
+CREATE TABLE Madera (
+    made_codigo INT NOT NULL,
+    made_color VARCHAR(20),
+    made_dureza VARCHAR(20)
+)
+GO
+
+ALTER TABLE Madera ADD CONSTRAINT FK_Madera_Codigo FOREIGN KEY (made_codigo) REFERENCES Tipo_Material (tipo_nombre)
+GO
+
+CREATE PROCEDURE Migracion_Madera
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Madera(
+        made_color,
+        made_dureza
+    )
+    SELECT DISTINCT
+        m.mate_codigo
+        tm.Madera_Color,
+        tm.Madera_Dureza
+        FROM GD1C2025.gd_esquema.Maestra tm
+        JOIN Material m ON m.mate_tipo LIKE 'Madera'
+        WHERE tm.Madera_Color IS NOT NULL AND tm.Madera_Dureza IS NOT NULL
+END
+GO
