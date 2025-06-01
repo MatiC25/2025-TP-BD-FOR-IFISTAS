@@ -1,37 +1,31 @@
--- Crear la nueva base de datos
-IF EXISTS (SELECT name FROM sys.databases WHERE name = 'ForIfistas')
-BEGIN
-    DROP DATABASE ForIfistas;
-END
+USE GD1C2025;
 GO
 
-CREATE DATABASE ForIfistas;
+-- ==================
+--     Schema
+-- ==================
+
+CREATE SCHEMA FORIF_ISTAS AUTHORIZATION dbo
 GO
-
--- Usar la base de datos recién creada
-USE ForIfistas;
-GO
-
-
 -- ==================
 -- TABLA: Provincia
 -- ==================
 
-CREATE TABLE Provincia (
+CREATE TABLE FORIF_ISTAS.Provincia (
     prov_codigo INT IDENTITY(1,1),
     prov_nombre VARCHAR(50)
 )
 GO
 
-ALTER TABLE Provincia ADD CONSTRAINT PK_Provincia PRIMARY KEY (prov_codigo)
+ALTER TABLE FORIF_ISTAS.Provincia ADD CONSTRAINT PK_Provincia PRIMARY KEY (prov_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Provincia
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Provincia
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Provincia (prov_nombre)
+    INSERT INTO FORIF_ISTAS.Provincia (prov_nombre)
         SELECT DISTINCT Cliente_Provincia FROM GD1C2025.gd_esquema.Maestra WHERE Cliente_Provincia IS NOT NULL
         UNION
         SELECT DISTINCT Proveedor_Provincia FROM GD1C2025.gd_esquema.Maestra WHERE Proveedor_Provincia IS NOT NULL
@@ -44,41 +38,41 @@ GO
 -- TABLA: Localidad
 -- ==================
 
-CREATE TABLE Localidad (
+CREATE TABLE FORIF_ISTAS.Localidad (
     loca_codigo INT IDENTITY(1,1),
     loca_nombre VARCHAR(50),
     loca_provincia INT
 )
 GO
 
-ALTER TABLE Localidad ADD CONSTRAINT PK_Localidad PRIMARY KEY (loca_codigo)
+ALTER TABLE FORIF_ISTAS.Localidad ADD CONSTRAINT PK_Localidad PRIMARY KEY (loca_codigo)
 GO
-ALTER TABLE Localidad ADD CONSTRAINT FK_Localidad_Provincia FOREIGN KEY (loca_provincia) REFERENCES Provincia(prov_codigo)
+ALTER TABLE FORIF_ISTAS.Localidad ADD CONSTRAINT FK_Localidad_Provincia FOREIGN KEY (loca_provincia) REFERENCES FORIF_ISTAS.Provincia(prov_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Localidad
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Localidad
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Localidad (loca_nombre, loca_provincia)
+    INSERT INTO FORIF_ISTAS.Localidad (loca_nombre, loca_provincia)
     SELECT DISTINCT m.Cliente_Localidad, p.prov_codigo
     FROM GD1C2025.gd_esquema.Maestra m
-    JOIN Provincia p ON p.prov_nombre = m.Cliente_Provincia
+    JOIN FORIF_ISTAS.Provincia p ON p.prov_nombre = m.Cliente_Provincia
     WHERE m.Cliente_Localidad IS NOT NULL
 
     UNION
 
     SELECT DISTINCT m.Proveedor_Localidad, p.prov_codigo
     FROM GD1C2025.gd_esquema.Maestra m
-    JOIN Provincia p ON p.prov_nombre = m.Proveedor_Provincia
+    JOIN FORIF_ISTAS.Provincia p ON p.prov_nombre = m.Proveedor_Provincia
     WHERE m.Proveedor_Localidad IS NOT NULL
 
     UNION
 
     SELECT DISTINCT m.Sucursal_Localidad, p.prov_codigo
     FROM GD1C2025.gd_esquema.Maestra m
-    JOIN Provincia p ON p.prov_nombre = m.Sucursal_Provincia
+    JOIN FORIF_ISTAS.Provincia p ON p.prov_nombre = m.Sucursal_Provincia
     WHERE m.Sucursal_Localidad IS NOT NULL
 END
 GO
@@ -87,27 +81,27 @@ GO
 -- TABLA: Direccion
 -- ==================
 
-CREATE TABLE Direccion (
+CREATE TABLE FORIF_ISTAS.Direccion (
     dire_codigo INT IDENTITY(1,1),
     dire_calle_altura VARCHAR(75),
     dire_localidad INT
 )
 GO
 
-ALTER TABLE Direccion ADD CONSTRAINT PK_Direccion PRIMARY KEY (dire_codigo)
+ALTER TABLE FORIF_ISTAS.Direccion ADD CONSTRAINT PK_Direccion PRIMARY KEY (dire_codigo)
 GO
-ALTER TABLE Direccion ADD CONSTRAINT FK_Direccion_Localidad FOREIGN KEY (dire_localidad) REFERENCES Localidad(loca_codigo)
+ALTER TABLE FORIF_ISTAS.Direccion ADD CONSTRAINT FK_Direccion_Localidad FOREIGN KEY (dire_localidad) REFERENCES FORIF_ISTAS.Localidad(loca_codigo)
 GO
-CREATE OR ALTER PROCEDURE Migracion_Direccion
+CREATE OR ALTER PROCEDURE FORIF_ISTAS.Migracion_Direccion
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Direccion (dire_calle_altura, dire_localidad)
+    INSERT INTO FORIF_ISTAS.Direccion (dire_calle_altura, dire_localidad)
     SELECT DISTINCT m.Cliente_Direccion, l.loca_codigo
     FROM GD1C2025.gd_esquema.Maestra m
-    JOIN Localidad l ON l.loca_nombre = m.Cliente_Localidad
-    JOIN Provincia p ON p.prov_nombre = m.Cliente_Provincia
+    JOIN FORIF_ISTAS.Localidad l ON l.loca_nombre = m.Cliente_Localidad
+    JOIN FORIF_ISTAS.Provincia p ON p.prov_nombre = m.Cliente_Provincia
         AND p.prov_codigo = l.loca_provincia
     WHERE m.Cliente_Direccion IS NOT NULL
 
@@ -115,8 +109,8 @@ BEGIN
 
     SELECT DISTINCT m.Proveedor_Direccion, l.loca_codigo
     FROM GD1C2025.gd_esquema.Maestra m
-    JOIN Localidad l ON l.loca_nombre = m.Proveedor_Localidad
-    JOIN Provincia p ON p.prov_nombre = m.Proveedor_Provincia
+    JOIN FORIF_ISTAS.Localidad l ON l.loca_nombre = m.Proveedor_Localidad
+    JOIN FORIF_ISTAS.Provincia p ON p.prov_nombre = m.Proveedor_Provincia
         AND p.prov_codigo = l.loca_provincia
     WHERE m.Proveedor_Direccion IS NOT NULL
 
@@ -124,8 +118,8 @@ BEGIN
 
     SELECT DISTINCT m.Sucursal_Direccion, l.loca_codigo
     FROM GD1C2025.gd_esquema.Maestra m
-    JOIN Localidad l ON l.loca_nombre = m.Sucursal_Localidad
-    JOIN Provincia p ON p.prov_nombre = m.Sucursal_Provincia
+    JOIN FORIF_ISTAS.Localidad l ON l.loca_nombre = m.Sucursal_Localidad
+    JOIN FORIF_ISTAS.Provincia p ON p.prov_nombre = m.Sucursal_Provincia
         AND p.prov_codigo = l.loca_provincia
     WHERE m.Sucursal_Direccion IS NOT NULL
 END
@@ -135,7 +129,7 @@ GO
 -- TABLA: Cliente
 -- ==================
 
-CREATE TABLE Cliente (
+CREATE TABLE FORIF_ISTAS.Cliente (
     clie_codigo INT IDENTITY(1,1),
     clie_nombre VARCHAR(50),
     clie_apellido VARCHAR(50),
@@ -148,17 +142,17 @@ CREATE TABLE Cliente (
 
 GO
 
-ALTER TABLE Cliente ADD CONSTRAINT PK_Cliente PRIMARY KEY (clie_codigo)
+ALTER TABLE FORIF_ISTAS.Cliente ADD CONSTRAINT PK_Cliente PRIMARY KEY (clie_codigo)
 GO
 
-ALTER TABLE Cliente ADD CONSTRAINT FK_Cliente_Direccion FOREIGN KEY (clie_direccion) REFERENCES Direccion (dire_codigo)
+ALTER TABLE FORIF_ISTAS.Cliente ADD CONSTRAINT FK_Cliente_Direccion FOREIGN KEY (clie_direccion) REFERENCES FORIF_ISTAS.Direccion (dire_codigo)
 GO
-CREATE OR ALTER PROCEDURE Migracion_Cliente
+CREATE OR ALTER PROCEDURE FORIF_ISTAS.Migracion_Cliente
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Cliente (
+    INSERT INTO FORIF_ISTAS.Cliente (
         clie_nombre,
         clie_apellido,
         clie_direccion,
@@ -176,9 +170,9 @@ BEGIN
         m.Cliente_Telefono, 
         m.Cliente_Dni
     FROM GD1C2025.gd_esquema.Maestra m
-    JOIN Direccion d ON d.dire_calle_altura = m.Cliente_Direccion
-    JOIN Localidad l ON l.loca_codigo = d.dire_localidad AND l.loca_nombre = m.Cliente_Localidad
-    JOIN Provincia p ON p.prov_codigo = l.loca_provincia
+    JOIN FORIF_ISTAS.Direccion d ON d.dire_calle_altura = m.Cliente_Direccion
+    JOIN FORIF_ISTAS.Localidad l ON l.loca_codigo = d.dire_localidad AND l.loca_nombre = m.Cliente_Localidad
+    JOIN FORIF_ISTAS.Provincia p ON p.prov_codigo = l.loca_provincia
                     AND p.prov_nombre = m.Cliente_Provincia
 END
 GO
@@ -187,7 +181,7 @@ GO
 -- TABLA: Envio
 -- ==================
 
-CREATE TABLE Envio(
+CREATE TABLE FORIF_ISTAS.Envio(
     envi_numero INT NOT NULL,
     envi_fecha_programada DATETIME2,
     envi_fecha_entrega DATETIME2, 
@@ -196,10 +190,10 @@ CREATE TABLE Envio(
 )
 GO
 
-ALTER TABLE Envio ADD CONSTRAINT PK_Envio PRIMARY KEY (envi_numero)
+ALTER TABLE FORIF_ISTAS.Envio ADD CONSTRAINT PK_Envio PRIMARY KEY (envi_numero)
 GO
 
-CREATE PROCEDURE Migracion_Envio
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Envio
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -226,7 +220,7 @@ GO
 -- TABLA: Sucursal
 -- ==================
 
-CREATE TABLE Sucursal( 
+CREATE TABLE FORIF_ISTAS.Sucursal( 
     sucu_numero INT NOT NULL,
     sucu_direccion INT,
     sucu_telefono INT,
@@ -234,18 +228,18 @@ CREATE TABLE Sucursal(
 )
 GO
 
-ALTER TABLE Sucursal ADD CONSTRAINT PK_Sucursal_Numero PRIMARY KEY (sucu_numero)
+ALTER TABLE FORIF_ISTAS.Sucursal ADD CONSTRAINT PK_Sucursal_Numero PRIMARY KEY (sucu_numero)
 GO
 
-ALTER TABLE Sucursal ADD CONSTRAINT FK_Sucursal_Direccion FOREIGN KEY (sucu_direccion) REFERENCES Direccion (dire_codigo)
+ALTER TABLE FORIF_ISTAS.Sucursal ADD CONSTRAINT FK_Sucursal_Direccion FOREIGN KEY (sucu_direccion) REFERENCES FORIF_ISTAS.Direccion (dire_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Sucursal
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Sucursal
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Sucursal(
+    INSERT INTO FORIF_ISTAS.Sucursal(
         sucu_numero,
         sucu_direccion,
         sucu_telefono,
@@ -255,11 +249,11 @@ BEGIN
         tm.Sucursal_NroSucursal,
         d.dire_codigo,
         tm.Sucursal_telefono,
-        Sucursal_mail
+        tm.Sucursal_mail
         FROM GD1C2025.gd_esquema.Maestra tm
-        JOIN Direccion d ON d.dire_calle_altura = tm.Sucursal_Direccion
-        JOIN Localidad l ON l.loca_codigo = d.dire_localidad
-        JOIN Provincia p ON p.prov_codigo = l.loca_provincia
+        JOIN FORIF_ISTAS.Direccion d ON d.dire_calle_altura = tm.Sucursal_Direccion
+        JOIN FORIF_ISTAS.Localidad l ON l.loca_codigo = d.dire_localidad
+        JOIN FORIF_ISTAS.Provincia p ON p.prov_codigo = l.loca_provincia
                             AND p.prov_nombre = tm.Sucursal_Provincia
                             AND l.loca_nombre = tm.Sucursal_Localidad
         WHERE tm.Sucursal_NroSucursal IS NOT NULL
@@ -270,7 +264,7 @@ GO
 -- TABLA: Factura
 -- ==================
 
-CREATE TABLE Factura( 
+CREATE TABLE FORIF_ISTAS.Factura( 
     fact_numero INT NOT NULL,
     fact_sucursal INT NOT NULL, -- CODIGO asociado a la sucursal || VARCHAR(50)
     fact_cliente INT, -- CODIGO asociado al cliente || VARCHAR(50)
@@ -280,20 +274,20 @@ CREATE TABLE Factura(
 )
 GO
 
-ALTER TABLE Factura ADD CONSTRAINT PK_Fact_Numero PRIMARY KEY (fact_numero, fact_sucursal)
+ALTER TABLE FORIF_ISTAS.Factura ADD CONSTRAINT PK_Fact_Numero PRIMARY KEY (fact_numero, fact_sucursal)
 GO  
 
-ALTER TABLE Factura ADD CONSTRAINT FK_FACT_Envio FOREIGN KEY (fact_envio) REFERENCES Envio (envi_numero)
+ALTER TABLE FORIF_ISTAS.Factura ADD CONSTRAINT FK_FACT_Envio FOREIGN KEY (fact_envio) REFERENCES FORIF_ISTAS.Envio (envi_numero)
 GO
-ALTER TABLE Factura ADD CONSTRAINT FK_Fact_cliente FOREIGN KEY (fact_cliente) REFERENCES Cliente (clie_codigo)
+ALTER TABLE FORIF_ISTAS.Factura ADD CONSTRAINT FK_Fact_cliente FOREIGN KEY (fact_cliente) REFERENCES FORIF_ISTAS.Cliente (clie_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Factura
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Factura
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Factura(
+    INSERT INTO FORIF_ISTAS.Factura(
         fact_numero,
         fact_sucursal, --> Numero de sucursal asociado
         fact_cliente, --> Numero de cleinte asociado
@@ -309,11 +303,11 @@ BEGIN
         e.envi_numero,
         tm.Factura_Fecha
         FROM GD1C2025.gd_esquema.Maestra tm
-        LEFT JOIN Sucursal s on tm.Sucursal_NroSucursal = s.sucu_numero
-        JOIN Cliente c ON tm.Cliente_Dni = c.clie_dni 
+        LEFT JOIN FORIF_ISTAS.Sucursal s on tm.Sucursal_NroSucursal = s.sucu_numero
+        JOIN FORIF_ISTAS.Cliente c ON tm.Cliente_Dni = c.clie_dni 
                         AND tm.Cliente_Nombre = c.clie_nombre 
                         AND tm.Cliente_Apellido = c.clie_apellido
-        JOIN Envio e ON tm.Envio_Numero = e.envi_numero
+        JOIN FORIF_ISTAS.Envio e ON tm.Envio_Numero = e.envi_numero
         WHERE tm.Factura_Numero IS NOT NULL
 END
 GO
@@ -323,7 +317,7 @@ GO
 -- TABLA: Pedido
 -- ==================
 
-CREATE TABLE Pedido (
+CREATE TABLE FORIF_ISTAS.Pedido (
     pedi_numero INT NOT NULL,
     pedi_sucursal INT, --> codigo asociado a la Sucursal
     pedi_cliente INT, --> codigo asociado al Cliente
@@ -333,17 +327,17 @@ CREATE TABLE Pedido (
 )
 GO
 
-ALTER TABLE Pedido ADD CONSTRAINT PK_Pedido_Numero PRIMARY KEY (pedi_numero)
+ALTER TABLE FORIF_ISTAS.Pedido ADD CONSTRAINT PK_Pedido_Numero PRIMARY KEY (pedi_numero)
 GO
-ALTER TABLE Pedido ADD CONSTRAINT FK_Pedido_Clinete FOREIGN KEY (pedi_cliente) REFERENCES Cliente(clie_codigo)
+ALTER TABLE FORIF_ISTAS.Pedido ADD CONSTRAINT FK_Pedido_Clinete FOREIGN KEY (pedi_cliente) REFERENCES FORIF_ISTAS.Cliente(clie_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Pedido
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Pedido
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Pedido (
+    INSERT INTO FORIF_ISTAS.Pedido (
         pedi_numero,
         pedi_sucursal,
         pedi_cliente,
@@ -360,8 +354,8 @@ BEGIN
         tm.Pedido_Total,
         tm.Pedido_Estado
     FROM GD1C2025.gd_esquema.Maestra tm
-    JOIN Cliente c ON tm.Cliente_Nombre = c.clie_nombre AND tm.Cliente_Apellido = c.clie_apellido AND tm.Cliente_Dni = c.clie_dni
-    JOIN Sucursal s ON tm.Sucursal_NroSucursal = s.sucu_numero
+    JOIN FORIF_ISTAS.Cliente c ON tm.Cliente_Nombre = c.clie_nombre AND tm.Cliente_Apellido = c.clie_apellido AND tm.Cliente_Dni = c.clie_dni
+    JOIN FORIF_ISTAS.Sucursal s ON tm.Sucursal_NroSucursal = s.sucu_numero
     WHERE tm.Pedido_Numero IS NOT NULL
 END
 GO
@@ -370,20 +364,20 @@ GO
 -- TABLA: Pedido Cancelacion
 -- ==================
 
-CREATE TABLE Pedido_Cancelacion (
+CREATE TABLE FORIF_ISTAS.Pedido_Cancelacion (
     pedi_c_numero INT NOT NULL, -- Numero asociado al numero de pedido (pedi_numero)
     pedi_c_fecha DATETIME2 NOT NULL,
     pedi_c_motivo VARCHAR(255) NOT NULL
 ) 
 GO
-ALTER TABLE Pedido_Cancelacion ADD CONSTRAINT FK_Pedido_Cancelacion_Numero FOREIGN KEY (pedi_c_numero) REFERENCES Pedido(pedi_numero)
+ALTER TABLE FORIF_ISTAS.Pedido_Cancelacion ADD CONSTRAINT FK_Pedido_Cancelacion_Numero FOREIGN KEY (pedi_c_numero) REFERENCES FORIF_ISTAS.Pedido(pedi_numero)
 GO
-CREATE PROCEDURE Migracion_Pedido_Cancelacion
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Pedido_Cancelacion
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Pedido_Cancelacion (
+    INSERT INTO FORIF_ISTAS.Pedido_Cancelacion (
         pedi_c_numero,
         pedi_c_fecha,
         pedi_c_motivo
@@ -394,7 +388,7 @@ BEGIN
         tm.Pedido_Cancelacion_Fecha,
         tm.Pedido_Cancelacion_Motivo
         FROM GD1C2025.gd_esquema.Maestra tm
-        JOIN Pedido p on p.pedi_numero = tm.Pedido_Numero
+        JOIN FORIF_ISTAS.Pedido p on p.pedi_numero = tm.Pedido_Numero
         WHERE tm.Pedido_Numero IS NOT NULL AND tm.Pedido_Cancelacion_Fecha IS NOT NULL AND tm.Pedido_Cancelacion_Motivo IS NOT NULL 
 END
 GO
@@ -403,7 +397,7 @@ GO
 -- TABLA: Proveedor
 -- ==================
 
-CREATE TABLE Proveedor(
+CREATE TABLE FORIF_ISTAS.Proveedor(
     prov_codigo INT IDENTITY(1,1),
     prov_razon_social VARCHAR(100) NOT NULL,
     prov_cuit VARCHAR(20), -- CUIT del proveedor
@@ -413,16 +407,16 @@ CREATE TABLE Proveedor(
 
 )
 GO
-ALTER TABLE Proveedor ADD CONSTRAINT PK_Proveedor PRIMARY KEY(prov_codigo)
+ALTER TABLE FORIF_ISTAS.Proveedor ADD CONSTRAINT PK_Proveedor PRIMARY KEY(prov_codigo)
 GO
-ALTER TABLE Proveedor ADD CONSTRAINT FK_Proveedor FOREIGN KEY(prov_direccion) REFERENCES Direccion(dire_codigo)
+ALTER TABLE FORIF_ISTAS.Proveedor ADD CONSTRAINT FK_Proveedor FOREIGN KEY(prov_direccion) REFERENCES FORIF_ISTAS.Direccion(dire_codigo)
 GO
-CREATE PROCEDURE Migracion_Proveedor
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Proveedor
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Proveedor (
+    INSERT INTO FORIF_ISTAS.Proveedor (
         prov_razon_social,
         prov_cuit,
         prov_direccion,
@@ -437,9 +431,9 @@ BEGIN
         tm.Proveedor_Telefono,
         tm.Proveedor_Mail
     FROM GD1C2025.gd_esquema.Maestra tm
-        JOIN Direccion d ON d.dire_calle_altura = tm.Proveedor_Direccion
-        JOIN Localidad l ON l.loca_codigo = d.dire_localidad
-        JOIN Provincia p ON p.prov_codigo = l.loca_provincia
+        JOIN FORIF_ISTAS.Direccion d ON d.dire_calle_altura = tm.Proveedor_Direccion
+        JOIN FORIF_ISTAS.Localidad l ON l.loca_codigo = d.dire_localidad
+        JOIN FORIF_ISTAS.Provincia p ON p.prov_codigo = l.loca_provincia
                             AND p.prov_nombre = tm.Proveedor_Provincia
                             AND l.loca_nombre = tm.Proveedor_Localidad
     WHERE tm.Proveedor_RazonSocial IS NOT NULL
@@ -451,7 +445,7 @@ GO
 -- ==================
 
 -- TODO: Ver como funciona el tema de la herencia hay que agregar uan FK para el tema de los poder entrar a el Material?? 
-CREATE TABLE Material(
+CREATE TABLE FORIF_ISTAS.Material(
     mate_codigo INT IDENTITY(1,1),-- Codigo material
     mate_nombre VARCHAR(100),
     mate_descipcion VARCHAR(255),
@@ -460,15 +454,15 @@ CREATE TABLE Material(
 )
 GO
 
-ALTER TABLE Material ADD CONSTRAINT PK_Material_Codigo PRIMARY KEY (mate_codigo)
+ALTER TABLE FORIF_ISTAS.Material ADD CONSTRAINT PK_Material_Codigo PRIMARY KEY (mate_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Material
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Material
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Material(
+    INSERT INTO FORIF_ISTAS.Material(
         mate_nombre,
         mate_descipcion,
         mate_precio,
@@ -489,7 +483,7 @@ GO
 -- TABLA: Madera
 -- ==================
 
-CREATE TABLE Madera(
+CREATE TABLE FORIF_ISTAS.Madera(
     made_codigo INT NOT NULL,
     made_tipo VARCHAR(20),
     made_color VARCHAR(20),
@@ -497,15 +491,15 @@ CREATE TABLE Madera(
 )
 GO
 
-ALTER TABLE Madera ADD CONSTRAINT FK_Madera_Codigo FOREIGN KEY (made_codigo) REFERENCES Material (mate_codigo)
+ALTER TABLE FORIF_ISTAS.Madera ADD CONSTRAINT FK_Madera_Codigo FOREIGN KEY (made_codigo) REFERENCES FORIF_ISTAS.Material (mate_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Madera
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Madera
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Madera(
+    INSERT INTO FORIF_ISTAS.Madera(
         made_codigo,
         made_tipo,
         made_color,
@@ -517,7 +511,7 @@ BEGIN
         tm.Madera_Color,
         tm.Madera_Dureza
         FROM GD1C2025.gd_esquema.Maestra tm
-        JOIN Material m on tm.Material_Tipo = m.mate_tipo AND m.mate_nombre = tm.Material_Nombre
+        JOIN FORIF_ISTAS.Material m on tm.Material_Tipo = m.mate_tipo AND m.mate_nombre = tm.Material_Nombre
         WHERE tm.Madera_Color IS NOT NULL AND tm.Madera_Dureza IS NOT NULL
 END
 GO
@@ -526,7 +520,7 @@ GO
 -- TABLA: Tela
 -- ==================
 
-CREATE TABLE Tela(
+CREATE TABLE FORIF_ISTAS.Tela(
     tela_codigo INT NOT NULL,
     tela_tipo VARCHAR(20),
     tela_color VARCHAR(20),
@@ -534,15 +528,15 @@ CREATE TABLE Tela(
 )
 GO
 
-ALTER TABLE Tela ADD CONSTRAINT FK_Tela_Codigo FOREIGN KEY (tela_codigo) REFERENCES Material (mate_codigo)
+ALTER TABLE FORIF_ISTAS.Tela ADD CONSTRAINT FK_Tela_Codigo FOREIGN KEY (tela_codigo) REFERENCES FORIF_ISTAS.Material (mate_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Tela
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Tela
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Tela(
+    INSERT INTO FORIF_ISTAS.Tela(
         tela_codigo,
         tela_tipo,
         tela_color,
@@ -554,7 +548,7 @@ BEGIN
         tm.Tela_Color,
         tm.Tela_Textura
         FROM GD1C2025.gd_esquema.Maestra tm
-        join Material m on tm.Material_Tipo = m.mate_tipo AND m.mate_nombre = tm.Material_Nombre
+        JOIN FORIF_ISTAS.Material m ON tm.Material_Tipo = m.mate_tipo AND m.mate_nombre = tm.Material_Nombre
         WHERE tm.Tela_Color IS NOT NULL AND tm.Tela_Textura IS NOT NULL
 END
 GO
@@ -563,22 +557,22 @@ GO
 -- TABLA: Relleno
 -- ==================
 
-CREATE TABLE Relleno(
+CREATE TABLE FORIF_ISTAS.Relleno(
     rell_codigo INT NOT NULL,
     rell_tipo VARCHAR(20),
     rell_densidad DECIMAL(10,2)
     )
 GO
 
-ALTER TABLE Relleno ADD CONSTRAINT PK_Relleno_Codigo FOREIGN KEY (rell_codigo) REFERENCES Material (mate_codigo)
+ALTER TABLE FORIF_ISTAS.Relleno ADD CONSTRAINT PK_Relleno_Codigo FOREIGN KEY (rell_codigo) REFERENCES FORIF_ISTAS.Material (mate_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Relleno
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Relleno
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Relleno(
+    INSERT INTO FORIF_ISTAS.Relleno(
         rell_codigo,
         rell_tipo,
         rell_densidad
@@ -588,7 +582,7 @@ BEGIN
         tm.Material_Tipo,
         tm.Relleno_Densidad
         FROM GD1C2025.gd_esquema.Maestra tm
-        join Material m on tm.material_tipo = m.mate_tipo AND m.mate_nombre = tm.Material_Nombre
+        join FORIF_ISTAS.Material m on tm.material_tipo = m.mate_tipo AND m.mate_nombre = tm.Material_Nombre
         WHERE tm.Relleno_Densidad IS NOT NULL
 END
 GO
@@ -598,21 +592,21 @@ GO
 -- TABLA: Modelo
 -- ==================
 
-CREATE TABLE Modelo(
+CREATE TABLE FORIF_ISTAS.Modelo(
     mode_code INT NOT NULL, -- Codigo asociado de sill_modelo_codigo
     mode_descripcion VARCHAR(255)
 )
 GO
 
-ALTER TABLE Modelo ADD CONSTRAINT PK_Modelo PRIMARY KEY (mode_code)
+ALTER TABLE FORIF_ISTAS.Modelo ADD CONSTRAINT PK_Modelo PRIMARY KEY (mode_code)
 GO
 
-CREATE PROCEDURE Migracion_Modelo
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Modelo
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Modelo(
+    INSERT INTO FORIF_ISTAS.Modelo(
         mode_code,
         mode_descripcion
     )
@@ -628,7 +622,7 @@ GO
 -- TABLA: Medidas
 -- ==================
 
-CREATE TABLE Medida(
+CREATE TABLE FORIF_ISTAS.Medida(
     medi_codigo INT IDENTITY(1,1),
     medi_alto DECIMAL(10, 2),
     medi_ancho DECIMAL(10, 2),
@@ -637,15 +631,15 @@ CREATE TABLE Medida(
 )
 GO
 
-ALTER TABLE Medida ADD CONSTRAINT PK_Medida PRIMARY KEY (medi_codigo);
+ALTER TABLE FORIF_ISTAS.Medida ADD CONSTRAINT PK_Medida PRIMARY KEY (medi_codigo);
 GO 
 
-CREATE PROCEDURE Migracion_Medida
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Medida
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Medida(
+    INSERT INTO FORIF_ISTAS.Medida(
         medi_alto,
         medi_ancho,
         medi_profundo,
@@ -665,26 +659,26 @@ GO
 -- TABLA: Sillon
 -- ==================
 
-CREATE TABLE Sillon(
+CREATE TABLE FORIF_ISTAS.Sillon(
     sill_codigo INT NOT NULL,
     sill_modelo INT, -- CODIGO MODELO
     sill_medida INT -- CODIGO MEDIDAS (Auto Incremental)
 )
 GO
 -- == Sillon == -- 
-ALTER TABLE Sillon ADD CONSTRAINT PK_Sillon PRIMARY KEY (sill_codigo)
+ALTER TABLE FORIF_ISTAS.Sillon ADD CONSTRAINT PK_Sillon PRIMARY KEY (sill_codigo)
 GO
-ALTER TABLE Sillon ADD CONSTRAINT FK_Sillon_Modelo_Codigo FOREIGN KEY (sill_modelo) REFERENCES Modelo(mode_code)
+ALTER TABLE FORIF_ISTAS.Sillon ADD CONSTRAINT FK_Sillon_Modelo_Codigo FOREIGN KEY (sill_modelo) REFERENCES FORIF_ISTAS.Modelo(mode_code)
 GO
-ALTER TABLE Sillon ADD CONSTRAINT FK_Sillon_Medida FOREIGN KEY (sill_medida) REFERENCES Medida(medi_codigo)
+ALTER TABLE FORIF_ISTAS.Sillon ADD CONSTRAINT FK_Sillon_Medida FOREIGN KEY (sill_medida) REFERENCES FORIF_ISTAS.Medida(medi_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Sillon
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Sillon
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO Sillon(
+    INSERT INTO FORIF_ISTAS.Sillon(
         sill_codigo,
         sill_modelo,
         sill_medida
@@ -694,7 +688,7 @@ BEGIN
         tm.Sillon_Modelo_Codigo,
 		m.medi_codigo
         FROM GD1C2025.gd_esquema.Maestra tm
-        JOIN Medida m on tm.Sillon_Medida_Alto = m.medi_alto AND
+        JOIN FORIF_ISTAS.Medida m on tm.Sillon_Medida_Alto = m.medi_alto AND
                          tm.Sillon_Medida_Ancho = m.medi_ancho AND
                          tm.Sillon_Medida_Profundidad = m.medi_profundo AND
                          tm.Sillon_Medida_Precio = m.medi_precio
@@ -706,23 +700,23 @@ GO
 -- TABLA: Sillon_Material
 -- ==================
 
-CREATE TABLE Sillon_Material(
+CREATE TABLE FORIF_ISTAS.Sillon_Material(
     sill_mate_codigo INT NOT NULL, -- Codigo materia x sillon
     sill_mate_material INT NOT NULL-- Codigo material
 )
 GO
 
-ALTER TABLE Sillon_Material ADD CONSTRAINT FK_Sillon_Material FOREIGN KEY (sill_mate_codigo) REFERENCES Sillon(sill_codigo)
+ALTER TABLE FORIF_ISTAS.Sillon_Material ADD CONSTRAINT FK_Sillon_Material FOREIGN KEY (sill_mate_codigo) REFERENCES FORIF_ISTAS.Sillon(sill_codigo)
 GO
-ALTER TABLE Sillon_Material ADD CONSTRAINT FK_Sillon_Material_Material FOREIGN KEY (sill_mate_material) REFERENCES Material(mate_codigo);
+ALTER TABLE FORIF_ISTAS.Sillon_Material ADD CONSTRAINT FK_Sillon_Material_Material FOREIGN KEY (sill_mate_material) REFERENCES FORIF_ISTAS.Material(mate_codigo);
 GO
 
-CREATE PROCEDURE Migracion_Sillon_Material
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Sillon_Material
 AS
 BEGIN
     SET NOCOUNT ON;
         
-    INSERT INTO Sillon_Material(
+    INSERT INTO FORIF_ISTAS.Sillon_Material(
         sill_mate_codigo,
         sill_mate_material
     )
@@ -730,8 +724,8 @@ BEGIN
         s.sill_codigo,
         m.mate_codigo
     FROM GD1C2025.gd_esquema.Maestra tm
-    JOIN Sillon s ON s.sill_codigo = tm.Sillon_Codigo AND s.sill_modelo = tm.Sillon_Modelo_Codigo
-    JOIN Material m ON m.mate_descipcion = tm.Material_Descripcion
+    JOIN FORIF_ISTAS.Sillon s ON s.sill_codigo = tm.Sillon_Codigo AND s.sill_modelo = tm.Sillon_Modelo_Codigo
+    JOIN FORIF_ISTAS.Material m ON m.mate_descipcion = tm.Material_Descripcion
 END
 GO
 
@@ -739,7 +733,7 @@ GO
 -- TABLA: Compra
 -- ==================
 
-CREATE TABLE Compra(
+CREATE TABLE FORIF_ISTAS.Compra(
     comp_numero INT NOT NULL,
     comp_sucursal INT, --> codigo asociado a la sucursal
     comp_proveedor INT, --> Codigo asociado al proveedor
@@ -748,21 +742,21 @@ CREATE TABLE Compra(
 )
 GO
 
-ALTER TABLE Compra ADD CONSTRAINT PK_Compra_ PRIMARY KEY (comp_numero)
+ALTER TABLE FORIF_ISTAS.Compra ADD CONSTRAINT PK_Compra_ PRIMARY KEY (comp_numero)
 GO
-ALTER TABLE Compra ADD CONSTRAINT FK_Compra_Sucursal FOREIGN KEY (comp_sucursal) REFERENCES Sucursal(sucu_numero)
+ALTER TABLE FORIF_ISTAS.Compra ADD CONSTRAINT FK_Compra_Sucursal FOREIGN KEY (comp_sucursal) REFERENCES FORIF_ISTAS.Sucursal(sucu_numero)
 GO
-ALTER TABLE Compra ADD CONSTRAINT FK_Compra_Proveedor FOREIGN KEY (comp_proveedor) REFERENCES Proveedor(prov_codigo)
+ALTER TABLE FORIF_ISTAS.Compra ADD CONSTRAINT FK_Compra_Proveedor FOREIGN KEY (comp_proveedor) REFERENCES FORIF_ISTAS.Proveedor(prov_codigo)
 GO
-ALTER TABLE Compra ADD CONSTRAINT ck_compra_total CHECK (comp_total > 0)
+ALTER TABLE FORIF_ISTAS.Compra ADD CONSTRAINT ck_compra_total CHECK (comp_total > 0)
 GO
 
-CREATE PROCEDURE Migracion_Compra
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Compra
 AS
 BEGIN
     SET NOCOUNT ON;
         
-    INSERT INTO Compra(
+    INSERT INTO FORIF_ISTAS.Compra(
         comp_numero,
         comp_sucursal,
         comp_proveedor,
@@ -776,8 +770,8 @@ BEGIN
     tm.Compra_Fecha,
     tm.Compra_Total
     FROM GD1C2025.gd_esquema.Maestra tm
-    JOIN Sucursal s ON s.sucu_numero = tm.Sucursal_NroSucursal
-    JOIN Proveedor p ON p.prov_cuit = tm.Proveedor_Cuit 
+    JOIN FORIF_ISTAS.Sucursal s ON s.sucu_numero = tm.Sucursal_NroSucursal
+    JOIN FORIF_ISTAS.Proveedor p ON p.prov_cuit = tm.Proveedor_Cuit 
 END
 GO
 
@@ -785,7 +779,7 @@ GO
 -- TABLA: Item_Compra
 -- ==================
 
-CREATE TABLE Item_Compra(
+CREATE TABLE FORIF_ISTAS.Item_Compra(
     item_c_numero INT NOT NULL, --> Numero asociado al numero de compra (comp_numero)
     item_c_material INT NOT NULL,  --> Codigo asociado al sillon
     item_c_precio DECIMAL(10, 2),
@@ -793,11 +787,11 @@ CREATE TABLE Item_Compra(
 )
 GO
 
-ALTER TABLE Item_Compra ADD CONSTRAINT FK_Item_Compra FOREIGN KEY (item_c_numero) REFERENCES Compra(comp_numero)
+ALTER TABLE FORIF_ISTAS.Item_Compra ADD CONSTRAINT FK_Item_Compra FOREIGN KEY (item_c_numero) REFERENCES FORIF_ISTAS.Compra(comp_numero)
 GO
-ALTER TABLE Item_Compra ADD CONSTRAINT FK_Item_Compra_Material FOREIGN KEY (item_c_material) REFERENCES Material(mate_codigo)
+ALTER TABLE FORIF_ISTAS.Item_Compra ADD CONSTRAINT FK_Item_Compra_Material FOREIGN KEY (item_c_material) REFERENCES FORIF_ISTAS.Material(mate_codigo)
 GO
-CREATE PROCEDURE Migracion_Item_Compra
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Item_Compra
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -813,8 +807,8 @@ BEGIN
         tm.Detalle_Compra_Precio,
         tm.Detalle_Compra_Cantidad
         FROM GD1C2025.gd_esquema.Maestra tm
-        JOIN Compra c ON c.comp_numero = tm.Compra_Numero
-        JOIN Material m ON tm.Material_Descripcion = m.mate_descipcion
+        JOIN FORIF_ISTAS.Compra c ON c.comp_numero = tm.Compra_Numero
+        JOIN FORIF_ISTAS.Material m ON tm.Material_Descripcion = m.mate_descipcion
 END
 GO
 
@@ -822,25 +816,25 @@ GO
 -- TABLA: Item_Pedido
 -- ==================
 
-CREATE TABLE Item_Pedido(
+CREATE TABLE FORIF_ISTAS.Item_Pedido(
     item_p_numero INT NOT NULL, -- Numero asociado al numero de pedido (pedi_numero)
     item_p_sillon INT NOT NULL, -- Numero asociado al numero de sillo (sill_codigo)
     item_p_precio DECIMAL(10, 2),
     item_p_cantidad INT,
 )
 GO
-ALTER TABLE Item_Pedido ADD CONSTRAINT PK_Item_Pedido PRIMARY KEY (item_p_numero, item_p_sillon)
+ALTER TABLE FORIF_ISTAS.Item_Pedido ADD CONSTRAINT PK_Item_Pedido PRIMARY KEY (item_p_numero, item_p_sillon)
 GO
-ALTER TABLE Item_Pedido ADD CONSTRAINT FK_Item_Pedido_Numero FOREIGN KEY (item_p_numero) REFERENCES Pedido(pedi_numero)
+ALTER TABLE FORIF_ISTAS.Item_Pedido ADD CONSTRAINT FK_Item_Pedido_Numero FOREIGN KEY (item_p_numero) REFERENCES FORIF_ISTAS.Pedido(pedi_numero)
 GO
-ALTER TABLE Item_Pedido ADD CONSTRAINT FK_Item_Pedido_Sillon FOREIGN KEY (item_p_sillon) REFERENCES Sillon(sill_codigo)
+ALTER TABLE FORIF_ISTAS.Item_Pedido ADD CONSTRAINT FK_Item_Pedido_Sillon FOREIGN KEY (item_p_sillon) REFERENCES FORIF_ISTAS.Sillon(sill_codigo)
 GO
 
-CREATE PROCEDURE Migracion_Item_Pedido
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Item_Pedido
 AS
 BEGIN
     SET NOCOUNT ON;
-    INSERT INTO Item_Pedido(
+    INSERT INTO FORIF_ISTAS.Item_Pedido(
         item_p_numero,
         item_p_sillon,
         item_p_precio,
@@ -852,9 +846,9 @@ BEGIN
         tm.Detalle_Pedido_Precio,
         tm.Detalle_Pedido_Cantidad
         FROM GD1C2025.gd_esquema.Maestra tm
-        JOIN Pedido p ON p.pedi_numero = tm.Pedido_Numero
-        JOIN Sillon s ON s.sill_codigo = tm.Sillon_Codigo 
-        WHERE Detalle_Pedido_Precio IS NOT NULL AND Detalle_Pedido_Cantidad IS NOT NULL
+        JOIN FORIF_ISTAS.Pedido p ON p.pedi_numero = tm.Pedido_Numero
+        JOIN FORIF_ISTAS.Sillon s ON s.sill_codigo = tm.Sillon_Codigo 
+        WHERE tm.Detalle_Pedido_Precio IS NOT NULL AND tm.Detalle_Pedido_Cantidad IS NOT NULL
 END
 GO
 
@@ -862,7 +856,7 @@ GO
 -- TABLA: Item_Pedido
 -- ==================
 
-CREATE TABLE Item_Factura(
+CREATE TABLE FORIF_ISTAS.Item_Factura(
     item_f_numero INT IDENTITY(1,1),
     item_f_numero_pedido INT NOT NULL,
     item_f_sillon INT NOT NULL, -- Codigo asociado al sillon
@@ -873,19 +867,19 @@ CREATE TABLE Item_Factura(
 )
 GO
 
-ALTER TABLE Item_Factura ADD CONSTRAINT PK_Item_Factura PRIMARY KEY (item_f_numero);
+ALTER TABLE FORIF_ISTAS.Item_Factura ADD CONSTRAINT PK_Item_Factura PRIMARY KEY (item_f_numero);
 GO
-ALTER TABLE Item_Factura ADD CONSTRAINT FK_Item_Factura_Numero_Pedido FOREIGN KEY (item_f_numero_pedido, item_f_sillon) REFERENCES Item_Pedido(item_p_numero, item_p_sillon);
+ALTER TABLE FORIF_ISTAS.Item_Factura ADD CONSTRAINT FK_Item_Factura_Numero_Pedido FOREIGN KEY (item_f_numero_pedido, item_f_sillon) REFERENCES FORIF_ISTAS.Item_Pedido(item_p_numero, item_p_sillon);
 GO
-ALTER TABLE Item_Factura ADD CONSTRAINT FK_Item_Factura_Numero_Factura FOREIGN KEY (item_f_numero_factura, item_f_sucursal) REFERENCES Factura(fact_numero, fact_sucursal);
+ALTER TABLE FORIF_ISTAS.Item_Factura ADD CONSTRAINT FK_Item_Factura_Numero_Factura FOREIGN KEY (item_f_numero_factura, item_f_sucursal) REFERENCES FORIF_ISTAS.Factura(fact_numero, fact_sucursal);
 GO
 
-CREATE PROCEDURE Migracion_Item_Factura
+CREATE PROCEDURE FORIF_ISTAS.Migracion_Item_Factura
 AS
 BEGIN   
     SET NOCOUNT ON;
 
-    INSERT INTO Item_Factura(
+    INSERT INTO FORIF_ISTAS.Item_Factura(
         item_f_numero_pedido, --> Codigo asociado al pedido
         item_f_sillon, --> Codigo asociado al sillon
         item_f_sucursal, --> Codigo asociado a la sucursal
@@ -901,9 +895,9 @@ BEGIN
         ip.item_p_cantidad,
         ip.item_p_precio
         FROM GD1C2025.gd_esquema.Maestra tm
-        JOIN Item_Pedido ip ON ip.item_p_sillon = tm.Sillon_Codigo AND ip.item_p_numero = tm.Pedido_Numero
-        JOIN Pedido p ON p.pedi_numero = ip.item_p_numero
-        JOIN Factura f ON p.pedi_cliente = f.fact_cliente AND f.fact_sucursal = tm.Sucursal_NroSucursal
+        JOIN FORIF_ISTAS.Item_Pedido ip ON ip.item_p_sillon = tm.Sillon_Codigo AND ip.item_p_numero = tm.Pedido_Numero
+        JOIN FORIF_ISTAS.Pedido p ON p.pedi_numero = ip.item_p_numero
+        JOIN FORIF_ISTAS.Factura f ON p.pedi_cliente = f.fact_cliente AND f.fact_sucursal = tm.Sucursal_NroSucursal
 END
 GO
 
@@ -911,49 +905,48 @@ GO
 -- EJECUTAR MIGRACIONES
 -- ==================
  
-EXEC Migracion_Provincia
+EXEC FORIF_ISTAS.Migracion_Provincia
 GO
-EXEC Migracion_Localidad
+EXEC FORIF_ISTAS.Migracion_Localidad
 GO
-EXEC Migracion_Direccion
+EXEC FORIF_ISTAS.Migracion_Direccion
 GO
-EXEC Migracion_Cliente
+EXEC FORIF_ISTAS.Migracion_Cliente
 GO
-EXEC Migracion_Envio
+EXEC FORIF_ISTAS.Migracion_Envio
 GO
-EXEC Migracion_Sucursal
+EXEC FORIF_ISTAS.Migracion_Sucursal
 GO
-EXEC Migracion_Factura
+EXEC FORIF_ISTAS.Migracion_Factura
 GO
-EXEC Migracion_Pedido
+EXEC FORIF_ISTAS.Migracion_Pedido
 GO
-EXEC Migracion_Pedido_Cancelacion
+EXEC FORIF_ISTAS.Migracion_Pedido_Cancelacion
 GO
-EXEC Migracion_Proveedor
+EXEC FORIF_ISTAS.Migracion_Proveedor
 GO
-EXEC Migracion_Material
+EXEC FORIF_ISTAS.Migracion_Material
 GO
-EXEC Migracion_Madera
+EXEC FORIF_ISTAS.Migracion_Madera
 GO
-EXEC Migracion_Tela
+EXEC FORIF_ISTAS.Migracion_Tela
 GO
-EXEC Migracion_Relleno
+EXEC FORIF_ISTAS.Migracion_Relleno
 GO
-EXEC Migracion_Modelo
+EXEC FORIF_ISTAS.Migracion_Modelo
 GO
-EXEC Migracion_Medida
+EXEC FORIF_ISTAS.Migracion_Medida
 GO
-EXEC Migracion_Sillon
+EXEC FORIF_ISTAS.Migracion_Sillon
 GO
-EXEC Migracion_Sillon_Material
+EXEC FORIF_ISTAS.Migracion_Sillon_Material
 GO
-EXEC Migracion_Compra
+EXEC FORIF_ISTAS.Migracion_Compra
 GO
-EXEC Migracion_Item_Compra
+EXEC FORIF_ISTAS.Migracion_Item_Compra
 GO
-EXEC Migracion_Item_Pedido
+EXEC FORIF_ISTAS.Migracion_Item_Pedido
 GO
-EXEC Migracion_Item_Factura
+EXEC FORIF_ISTAS.Migracion_Item_Factura
 GO
-EXEC Migracion_Item_Factura
-GO
+
