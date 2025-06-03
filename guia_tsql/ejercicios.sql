@@ -216,4 +216,160 @@ factura de un artículo con composición realice el movimiento de sus
 correspondientes componentes.
 */
 
-create trigger ej9 on item_factura for insert, delete
+
+	-- == CLASE PREENCIAL ==
+/*
+Cree el/los objetos de base de datos necesarios para que dado un código de
+empleado se retorne la cantidad de empleados que este tiene a su cargo (directa o
+indirectamente). Solo contar aquellos empleados (directos o indirectos) que
+tengan un código mayor que su jefe directo.
+*/
+GO
+alter function cantEmpleadosACargo(@empleado numeric(6))
+returns decimal(12,2)
+as
+BEGIN
+	declare @cant decimal(12,2), @emplaux numeric(6)
+	declare empl_cur cursor for select empl_codigo from Empleado where empl_jefe = @empleado
+																
+	open empl_cur
+	fetch next from empl_cur into @emplaux
+	select @cant = 0
+	WHILE @@FETCH_STATUS = 0
+		BEGIN
+			select @cant = @cant + 1 + dbo.cantEmpleadosACargo(@emplaux)
+			fetch next from empl_cur into @emplaux
+		END
+	close empl_cur
+	deallocate empl_cur
+	return @cant
+END
+
+select count(*) from Empleado where empl_jefe = 3
+GO
+BEGIN TRANSACTION
+select cantidadACargo = dbo.cantEmpleadosACargo(1)
+rollback transaction
+ select count (*), empl_codigo from Empleado where empl_jefe = 3
+																group by empl_codigo
+
+/*12. Cree el/los objetos de base de datos necesarios para que nunca un producto
+p
+ueda ser compuesto por sí mismo. Se sabe que en la actualidad dicha regla se
+cumple y que la base de datos es accedida por n aplicaciones de diferentes tipos
+y tecnologías. No se conoce la cantidad de niveles de composición existentes.*/
+
+go
+create trigger noCompuesto on Composicion after insert 
+AS
+BEGIN 
+	if((select SUM(dbo.esComponente(comp_producto, comp_componente)) from inserted) > 0) ROLLBACK
+END
+ 
+GO
+create function esComponente(@prod1 char(8), @prod2 char(8))
+returns BIGINT 
+as
+BEGIN
+	if(@prod1 = @prod2) RETURN 1
+	ELSE
+		BEGIN
+		declare @prod_aux char(8)
+		declare c1 cursor for SELECT comp_componente FROM Composicion where comp_producto = @prod2								
+		open c1
+		fetch next from c1 into @prod_aux
+		WHILE @@FETCH_STATUS = 0
+		if(dbo.esComponente(@prod1, @prod_aux) = 1) return 1
+		fetch next from c1 into @prod_aux
+		END
+	return 0
+END	
+
+/*Agregar el/los objetos necesarios para que si un cliente compra un producto
+compuesto a un precio menor que la suma de los precios de sus componentes
+que imprima la fecha, que cliente, que productos y a qué precio se realizó la
+compra. No se deberá permitir que dicho precio sea menor a la mitad de la suma
+de los componentes.*/
+
+create trigger compraProducto on Item_factura instead of insert
+as
+BEGIN 
+	declare @prodaux char(8)
+	declare c1 cursor for SELECT item_producto from inserted
+	open c1
+	fetch next from c1 into @prodaux
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		declare @fecha smalldatetime, @clie char(6), @prod1 char(8), @prec decimal(12,2)
+		declare @precio decimal(12,2)
+		SELECT @precio = (SELECT prod_precio FROM Producto where prod_codigo = @prodaux)
+		if(@precio <= dbo.sumaComponentes(@prodaux)/2) 
+			print 'Estas robando, no se inserto'
+		else if(@precio < dbo.sumaComponentes(@prodaux))
+			BEGIN
+				INSERT INTO Item_Factura (
+					item_tipo,
+					item_sucursal,
+					item_numero,
+					item_producto,
+					item_cantidad,
+				item_precio
+			)
+			(SELECT item_tipo, item_sucursal, item_numero, item_producto, item_cantidad, item_precio FROM Inserted JOIN Factura on item_tipo+item_sucursal+item_numero = fact_tipo+fact_sucursal+fact_numero
+																									WHERE item_producto = @prodaux)
+			(SELECT 
+					 @fecha = fact_fecha, 
+					 @clie = fact_cliente, 
+					 @prod1 = item_producto, 
+					 @prec = item_precio
+					 FROM Inserted 
+					 JOIN Factura ON item_tipo + item_sucursal + item_numero = fact_tipo + fact_sucursal + fact_numero WHERE item_producto = @prodaux)
+				print 'Fecha: ' + @fecha + '  Cliente: ' + @clie + ' Producto: ' + @prod1 + ' Precio: ' + @prec 
+			END
+			else
+			BEGIN
+				INSERT INTO Item_Factura (
+					item_tipo,
+					item_sucursal,
+					item_numero,
+					item_producto,
+					item_cantidad,
+					item_precio
+							)
+					(SELECT item_tipo, item_sucursal, item_numero, item_producto, item_cantidad, item_precio FROM Inserted JOIN Factura on item_tipo+item_sucursal+item_numero = fact_tipo+fact_sucursal+fact_numero
+																				WHERE item_producto = @prodaux)
+			END
+		fetch next from c1 into @prodaux
+		close c1
+		deallocate c1
+	END
+END
+
+
+
+create function sumaComponentes(@prod char(8))
+returns decimal(12,2)
+AS
+BEGIN
+	return (SELECT SUM(prod_precio*comp_cantidad) --SUM(prod_precio) 
+	FROM Composicion
+	JOIN Producto on prod_codigo = comp_componente 
+	WHERE comp_producto = @prod
+	GROUP BY @prod)		
+END
+GO
+create procedure guardarItemFactura(@prodaux char(8))
+as
+BEGIN
+INSERT INTO Item_Factura (
+			item_tipo,
+			item_sucursal,
+			item_numero,
+			item_producto,
+			item_cantidad,
+			item_precio
+			)
+			(SELECT item_tipo, item_sucursal, item_numero, item_producto, item_cantidad, item_precio FROM Item_Factura JOIN Factura on item_tipo+item_sucursal+item_numero = fact_tipo+fact_sucursal+fact_numero
+																				WHERE item_producto = @prodaux)
+END
+
