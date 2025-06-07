@@ -216,15 +216,19 @@ factura de un artículo con composición realice el movimiento de sus
 correspondientes componentes.
 */
 
+/* 10. Crear el/los objetos de base de datos que ante el intento de borrar un artículo
+verifique que no exista stock y si es así lo borre en caso contrario que emita un
+mensaje de error.
+*/
 
 	-- == CLASE PREENCIAL ==
 /*
-Cree el/los objetos de base de datos necesarios para que dado un código de
+11. Cree el/los objetos de base de datos necesarios para que dado un código de
 empleado se retorne la cantidad de empleados que este tiene a su cargo (directa o
 indirectamente). Solo contar aquellos empleados (directos o indirectos) que
 tengan un código mayor que su jefe directo.
 */
-GO
+
 alter function cantEmpleadosACargo(@empleado numeric(6))
 returns decimal(12,2)
 as
@@ -285,7 +289,61 @@ BEGIN
 	return 0
 END	
 
-/*Agregar el/los objetos necesarios para que si un cliente compra un producto
+/*
+13. Cree el/los objetos de base de datos necesarios para implantar la siguiente regla
+“Ningún jefe puede tener un salario mayor al 20% de las suma de los salarios de
+sus empleados totales (directos + indirectos)”. Se sabe que en la actualidad dicha
+regla se cumple y que la base de datos es accedida por n aplicaciones de
+diferentes tipos y tecnologías
+*/
+
+alter function sumaSalariosEmpleadosACargo(@jefe numeric(6))
+returns decimal(12,2)
+AS
+BEGIN
+	declare @salarioTotal decimal(12,2), @emplaux numeric(6)
+	declare c1 cursor for SELECT empl_codigo FROM Empleado WHERE empl_jefe = @jefe
+	open c1
+	fetch next from c1 into @emplaux
+
+	SELECT @salarioTotal = 0
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		declare @salarioaux decimal(12,2)
+		SELECT @salarioaux = (SELECT empl_salario FROM Empleado WHERE empl_codigo = @emplaux)
+		SELECT @salarioTotal = @salarioTotal + @salarioaux  + dbo.sumaSalariosEmpleadosACargo(@emplaux)
+		fetch next from c1 into @emplaux
+	END
+	close c1 
+	deallocate c1
+	return @salarioTotal
+END
+
+
+alter procedure ej13reglaSalario
+AS
+BEGIN
+    declare @sumaSalario decimal(12,2), @salarioaux decimal(12,2), @emplaux numeric(6)
+    declare c3 cursor for 
+        SELECT dbo.sumaSalariosEmpleadosACargo(e1.empl_codigo) as sumaSalario , e1.empl_salario as Salario , e1.empl_codigo as Codigo FROM Empleado e1 WHERE (SELECT COUNT(*) FROM Empleado where e1.empl_codigo = empl_jefe) > 0
+
+    open c3
+    fetch next from c3 into @sumaSalario, @salarioaux, @emplaux
+    WHILE @@FETCH_STATUS = 0
+    BEGIN 
+        if(@sumaSalario*0.20 < @salarioaux)
+            print 'El empleado ' + CONVERT(varchar, @emplaux) + ' rompe con la regla'
+        else 
+            print 'Nadie rompe con la regla'
+        fetch next from c3 into @sumaSalario, @salarioaux, @emplaux
+    END
+    close c3
+    deallocate c3
+END
+
+exec dbo.ej13reglaSalario
+
+/* 14. Agregar el/los objetos necesarios para que si un cliente compra un producto
 compuesto a un precio menor que la suma de los precios de sus componentes
 que imprima la fecha, que cliente, que productos y a qué precio se realizó la
 compra. No se deberá permitir que dicho precio sea menor a la mitad de la suma
@@ -373,3 +431,278 @@ INSERT INTO Item_Factura (
 																				WHERE item_producto = @prodaux)
 END
 
+
+/*15. Cree el/los objetos de base de datos necesarios para que el objeto principal
+reciba un producto como parametro y retorne el precio del mismo.
+Se debe prever que el precio de los productos compuestos sera la sumatoria de
+los componentes del mismo multiplicado por sus respectivas cantidades. No se
+conocen los nivles de anidamiento posibles de los productos. Se asegura que
+nunca un producto esta compuesto por si mismo a ningun nivel. El objeto
+principal debe poder ser utilizado como filtro en el where de una sentencia
+select.
+*/
+
+create function sumaComponentes(@prod char(8))
+returns decimal(12,2)
+AS
+BEGIN
+	return (SELECT SUM(prod_precio*comp_cantidad) --SUM(prod_precio) 
+	FROM Composicion
+	JOIN Producto on prod_codigo = comp_componente 
+	WHERE comp_producto = @prod)		
+END
+
+alter function ej15PrecioTotal(@prod char(8))
+returns decimal(12,2)
+AS
+BEGIN
+	declare @precioTotal decimal(12,2 )
+	if((SELECT COUNT(*) FROM Composicion WHERE comp_producto = @prod) > 0) 
+		set @precioTotal = dbo.sumaComponentes(@prod) 
+	else 
+		set @precioTotal = (select prod_precio FROM Producto WHERE prod_codigo = @prod)
+	return @precioTotal
+END
+
+SELECT prod_codigo, prod_precio, dbo.ej15PrecioTotal(prod_codigo) as PrecioReal, (SELECT COUNT(*) FROM Composicion WHERE comp_producto = prod_codigo) as cantComponentes 
+FROM Producto
+order by 4 desc
+
+/*
+16. Desarrolle el/los elementos de base de datos necesarios para que ante una venta
+automaticamante se descuenten del stock los articulos vendidos. Se descontaran
+del deposito que mas producto poseea y se supone que el stock se almacena
+tanto de productos simples como compuestos (si se acaba el stock de los
+compuestos no se arman combos)
+En caso que no alcance el stock de un deposito se descontara del siguiente y asi
+hasta agotar los depositos posibles. En ultima instancia se dejara stock negativo
+en el ultimo deposito que se desconto.
+*/
+
+create trigger actualizarStock ON Item_factura AFTER INSERT
+AS
+BEGIN 
+	declare @prodaux char(8), @cantaux decimal(12,2)
+	declare c1 cursor for SELECT item_producto, item_cantidad FROM inserted
+	open c1
+	fetch next from c1 into @prodaux, @cantaux
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		WHILE @cantaux > 0
+		BEGIN
+			declare @depo char(2), @stockActual decimal(12,2)
+			SELECT TOP 1 @depo = stoc_deposito, 
+						 @stockActual = stoc_deposito 
+							FROM STOCK 
+							WHERE stoc_producto = @prodaux order by stoc_cantidad desc
+			
+			if((@stockActual - @cantaux) >= 0  OR @stockActual = 0)  -- Si alcanza el stock o si el stock es cero
+			BEGIN 
+				UPDATE STOCK SET stoc_cantidad = stoc_cantidad - @cantaux
+				WHERE stoc_producto = @prodaux AND stoc_deposito = @depo
+				set @cantaux = 0
+			END
+
+			if(((@stockActual - @cantaux)) < 0) -- Si el stock no es suficiente y hay más depositos con ese producto
+			BEGIN 
+				set @cantaux = @cantaux - @stockActual
+				UPDATE STOCK SET stoc_cantidad = 0
+				WHERE stoc_producto = @prodaux AND stoc_deposito = @depo
+			END
+		END
+		fetch next from c1 into @prodaux, @cantaux
+	END
+	close c1
+	deallocate c1
+END
+
+/*
+17. Sabiendo que el punto de reposicion del stock es la menor cantidad de ese objeto
+que se debe almacenar en el deposito y que el stock maximo es la maxima
+cantidad de ese producto en ese deposito, cree el/los objetos de base de datos
+necesarios para que dicha regla de negocio se cumpla automaticamente. No se
+conoce la forma de acceso a los datos ni el procedimiento por el cual se
+incrementa o descuenta stock
+*/
+
+create trigger checkStock ON STOCK AFTER INSERT
+AS
+BEGIN 
+	declare @stocProdAux char(8), @depoAux char(2)
+	declare c1 cursor for SELECT stoc_producto, stoc_deposito FROM inserted 
+	open c1
+	fetch next from c1 into @stocProdAux, @depoAux 
+	WHILE @@FETCH_STATUS = 0
+	BEGIN 
+		declare @stockActual decimal(12,2), @puntoRepo decimal(12,2), @puntoMax decimal(12,2)
+		SELECT @stockActual = stoc_cantidad, @puntoRepo = stoc_punto_reposicion, @puntoMax = stoc_stock_maximo FROM STOCK 
+													WHERE stoc_producto = @stocProdAux AND stoc_deposito = @depoAux 
+		if(@stockActual < @puntoRepo ) print 'Es hora de una reposicion'
+
+		if(@stockActual > @puntoMax)
+		BEGIN 
+			declare @dif decimal(12,2)
+			set @dif = @stockActual - @puntoMax
+			print 'Se excedió del stock maximo'
+
+			update STOCK set stoc_cantidad = stoc_stock_maximo
+			WHERE stoc_producto = @stocProdAux AND stoc_deposito = @depoAux 
+
+			declare @otroDeposito CHAR(2)
+
+			SELECT TOP 1 @otroDeposito = stoc_deposito 
+			FROM STOCK 
+			WHERE stoc_producto = @stocProdAux AND stoc_deposito <> @depoAux 
+			ORDER BY stoc_cantidad ASC -- El depo que menos stock tenga
+
+			if(@otroDeposito IS NOT NULL) -- Checkeamos que haya otro deposito para ese producto 
+			BEGIN
+				update STOCK 
+				set stoc_cantidad = stoc_cantidad + @dif
+				WHERE stoc_producto = @stocProdAux AND stoc_deposito = @otroDeposito
+			END
+		END
+		FETCH NEXT FROM c1 INTO @stocProdAux, @depoAux
+	END
+	close c1
+	deallocate c1
+END
+
+/*
+18. Sabiendo que el limite de credito de un cliente es el monto maximo que se le
+puede facturar mensualmente, cree el/los objetos de base de datos necesarios
+para que dicha regla de negocio se cumpla automaticamente. No se conoce la
+forma de acceso a los datos ni el procedimiento por el cual se emiten las facturas
+*/
+
+create trigger checkLimiteMax ON Factura INSTEAD OF INSERT
+AS
+BEGIN 
+	declare @fact_id char(13), @facTotalAux decimal(12,2), @clieAux char(6), @fechaAux smalldatetime
+	declare c1 cursor for SELECT fact_tipo+fact_sucursal+fact_numero , fact_total, fact_cliente, fact_fecha FROM inserted 
+	open c1 
+	fetch next from c1 into @fact_id, @facTotalAux, @clieAux, @fechaAux
+
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		declare @checkLimite decimal(12,2), @limiteMax decimal(12,2)
+		SELECT @checkLimite = SUM(fact_total) FROM Factura
+														WHERE fact_cliente = @clieAux AND MONTH(fact_fecha) = MONTH(@fechaAux) -- Checkeamos que sea del ultimo mes, 
+																															   -- no comparo por año xq se supone que las facturas nuevas son del año actual
+		SELECT @limiteMax = clie_limite_credito FROM Cliente WHERE clie_codigo = @clieAux
+		if(@checkLimite + @facTotalAux <= @limiteMax) -- Si la suma de la factura actual y todas las anterios está dentro del limite 
+		BEGIN 
+			INSERT INTO Factura (
+				fact_tipo, fact_sucursal, fact_numero, fact_fecha, 
+				fact_vendedor, fact_total, fact_total_impuestos, fact_cliente
+			)
+			SELECT fact_tipo, fact_sucursal, fact_numero, fact_fecha, 
+				   fact_vendedor, fact_total, fact_total_impuestos, fact_cliente
+			FROM inserted
+			WHERE fact_tipo+fact_sucursal+fact_numero = @fact_id -- Para buscar los datos que se estaba insertando necesitamos un id
+																 -- en el cursor se pueden guardar los 3 parametros x separado
+																 -- pero para simplificar lo guardé en uno 
+		END
+		ELSE
+		BEGIN 
+			print 'El cliente ' + @clieAux  + ' se pasó del limite'
+		END
+	END
+	close c1
+	deallocate c1
+END
+
+/*
+19. Cree el/los objetos de base de datos necesarios para que se cumpla la siguiente
+regla de negocio automáticamente “Ningún jefe puede tener menos de 5 años de
+antigüedad y tampoco puede tener más del 50% del personal a su cargo
+(contando directos e indirectos) a excepción del gerente general”. Se sabe que en
+la actualidad la regla se cumple y existe un único gerente general.
+*/
+
+
+/*
+20. Crear el/los objeto/s necesarios para mantener actualizadas las comisiones del
+vendedor.
+El cálculo de la comisión está dado por el 5% de la venta total efectuada por ese
+vendedor en ese mes, más un 3% adicional en caso de que ese vendedor haya
+vendido por lo menos 50 productos distintos en el mes.
+*/
+
+/*
+21. Desarrolle el/los elementos de base de datos necesarios para que se cumpla
+automaticamente la regla de que en una factura no puede contener productos de
+diferentes familias. En caso de que esto ocurra no debe grabarse esa factura y
+debe emitirse un error en pantalla.
+*/
+/*
+22. Se requiere recategorizar los rubros de productos, de forma tal que nigun rubro
+tenga más de 20 productos asignados, si un rubro tiene más de 20 productos
+asignados se deberan distribuir en otros rubros que no tengan mas de 20
+productos y si no entran se debra crear un nuevo rubro en la misma familia con
+la descirpción “RUBRO REASIGNADO”, cree el/los objetos de base de datos
+necesarios para que dicha regla de negocio quede implementada.
+*/
+/*
+23. Desarrolle el/los elementos de base de datos necesarios para que ante una venta
+automaticamante se controle que en una misma factura no puedan venderse más
+de dos productos con composición. Si esto ocurre debera rechazarse la factura.
+*/
+/*
+24. Se requiere recategorizar los encargados asignados a los depositos. Para ello
+cree el o los objetos de bases de datos necesarios que lo resueva, teniendo en
+cuenta que un deposito no puede tener como encargado un empleado que
+pertenezca a un departamento que no sea de la misma zona que el deposito, si
+esto ocurre a dicho deposito debera asignársele el empleado con menos
+depositos asignados que pertenezca a un departamento de esa zona.
+*/
+/*
+25. Desarrolle el/los elementos de base de datos necesarios para que no se permita
+que la composición de los productos sea recursiva, o sea, que si el producto A
+compone al producto B, dicho producto B no pueda ser compuesto por el
+producto A, hoy la regla se cumple.
+*/
+/*
+26. Desarrolle el/los elementos de base de datos necesarios para que se cumpla
+automaticamente la regla de que una factura no puede contener productos que
+sean componentes de otros productos. En caso de que esto ocurra no debe
+grabarse esa factura y debe emitirse un error en pantalla.
+*/
+
+/*
+27. Se requiere reasignar los encargados de stock de los diferentes depósitos. Para
+ello se solicita que realice el o los objetos de base de datos necesarios para
+asignar a cada uno de los depósitos el encargado que le corresponda,
+entendiendo que el encargado que le corresponde es cualquier empleado que no
+es jefe y que no es vendedor, o sea, que no está asignado a ningun cliente, se
+deberán ir asignando tratando de que un empleado solo tenga un deposito
+asignado, en caso de no poder se irán aumentando la cantidad de depósitos
+progresivamente para cada empleado.
+*/
+/*
+28. Se requiere reasignar los vendedores a los clientes. Para ello se solicita que
+realice el o los objetos de base de datos necesarios para asignar a cada uno de los
+clientes el vendedor que le corresponda, entendiendo que el vendedor que le
+corresponde es aquel que le vendió más facturas a ese cliente, si en particular un
+cliente no tiene facturas compradas se le deberá asignar el vendedor con más
+venta de la empresa, o sea, el que en monto haya vendido más.
+*/
+/*
+29. Desarrolle el/los elementos de base de datos necesarios para que se cumpla
+automaticamente la regla de que una factura no puede contener productos que
+sean componentes de diferentes productos. En caso de que esto ocurra no debe
+grabarse esa factura y debe emitirse un error en pantalla.
+*/
+/*
+30. Agregar el/los objetos necesarios para crear una regla por la cual un cliente no
+pueda comprar más de 100 unidades en el mes de ningún producto, si esto
+ocurre no se deberá ingresar la operación y se deberá emitir un mensaje “Se ha
+superado el límite máximo de compra de un producto”. Se sabe que esta regla se
+cumple y que las facturas no pueden ser modificadas.
+*/
+/*
+31. Desarrolle el o los objetos de base de datos necesarios, para que un jefe no pueda
+tener más de 20 empleados a cargo, directa o indirectamente, si esto ocurre
+debera asignarsele un jefe que cumpla esa condición, si no existe un jefe para
+asignarle se le deberá colocar como jefe al gerente general que es aquel que no
+tiene jefe.*/
