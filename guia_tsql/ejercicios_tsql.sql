@@ -229,7 +229,7 @@ indirectamente). Solo contar aquellos empleados (directos o indirectos) que
 tengan un código mayor que su jefe directo.
 */
 
-alter function cantEmpleadosACargo(@empleado numeric(6))
+create function cantEmpleadosACargo(@empleado numeric(6))
 returns decimal(12,2)
 as
 BEGIN
@@ -620,6 +620,71 @@ antigüedad y tampoco puede tener más del 50% del personal a su cargo
 la actualidad la regla se cumple y existe un único gerente general.
 */
 
+create function cantEmpleadosACargo(@empleado numeric(6))
+returns decimal(12,2)
+as
+BEGIN
+	declare @cant decimal(12,2), @emplaux numeric(6)
+	declare empl_cur cursor for select empl_codigo from Empleado where empl_jefe = @empleado
+																
+	open empl_cur
+	fetch next from empl_cur into @emplaux
+	select @cant = 0
+	WHILE @@FETCH_STATUS = 0
+		BEGIN
+			select @cant = @cant + 1 + dbo.cantEmpleadosACargo(@emplaux)
+			fetch next from empl_cur into @emplaux
+		END
+	close empl_cur
+	deallocate empl_cur
+	return @cant
+END
+
+create trigger ej19 ON Empleado AFTER INSERT
+AS
+BEGIN
+	declare @jefe numeric(6), @cantaux decimal(12,2)
+	declare c1 cursor for SELECT empl_jefe, dbo.cantEmpleadosACargo(empl_jefe) FROM Inserted
+	open c1
+	fetch next from c1 into @jefe, @cantaux
+		WHILE @@FETCH_STATUS = 0
+		BEGIN
+			declare @antiguedad smalldatetime, @cantEmpl decimal(12,2)
+
+			SELECT @antiguedad = empl_ingreso FROM Empleado WHERE empl_codigo = @jefe
+			SELECT @cantEmpl = COUNT(*) FROM Empleado 
+
+			if(DATEDIFF(YEAR, @antiguedad, GETDATE()) < 5) -- DateDIFF devuelve la diferencia entre dos valores
+			BEGIN
+				print 'Ningún jefe puede tener menos de 5 años de antigüedad'
+				ROLLBACK
+				RETURN
+			END
+
+			if(@cantaux > @cantEmpl*0.5 AND esGerenteGeneral(@jefe) <> 1)
+			BEGIN
+				print 'Tampoco puede tener más del 50% del personal a su cargo (contando directos e indirectos) a excepción del gerente general'
+				ROLLBACK
+				RETURN
+			END
+			fetch next from c1 into @jefe, @cantaux
+		END
+	close c1 
+	deallocate c1
+END
+
+create function esGerenteGeneral(@empl numeric(6))
+returns BIT
+AS
+BEGIN
+	declare @jefe numeric(6)
+	select @jefe = (select top 1 empl_codigo from empleado where empl_jefe is null 
+                                    order by empl_salario desc, empl_ingreso asc
+	if(@empl = @jefe) 
+		return 1
+	else 
+		return 0
+END
 
 /*
 20. Crear el/los objeto/s necesarios para mantener actualizadas las comisiones del
@@ -629,12 +694,54 @@ vendedor en ese mes, más un 3% adicional en caso de que ese vendedor haya
 vendido por lo menos 50 productos distintos en el mes.
 */
 
+-- == Siento que este se puede hacer sin cursor, pero no estoy seguro == -- 
+
+create procedure ej20 
+AS
+BEGIN 
+	declare @emplAux
+	create c1 cursor for SELECT empl_codigo FROM Empleado
+	open c1
+	fetch next from c1 into @emplAux
+	WHILE @@FETCH_STATUS = 0
+	BEGIN 
+		declare @totalVenta decimal(12,2), @cantProd decimal(12,2)
+		SELECT @totalVenta = SUM(fact_total), @cantProd = COUNT(distinct item_producto) FROM Factura
+		JOIN Item_Factura ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero 
+		WHERE fact_vendedor = @emplAux AND YEAR(fact_fecha) = YEAR(GETDATE()) AND MONTH(fact_fecha) = MONTH(GETDATE()) 
+
+		update Empleado set empl_comision   
+		CASE 
+            WHEN @cantProd >= 50 THEN @totalVenta * 0.08
+            ELSE @totalVenta * 0.05
+        END
+    	WHERE empl_codigo = @emplAux
+
+		fetch next from c1 into @emplAux
+	END
+	close c1
+	deallocate c1
+
+END
+
 /*
 21. Desarrolle el/los elementos de base de datos necesarios para que se cumpla
 automaticamente la regla de que en una factura no puede contener productos de
 diferentes familias. En caso de que esto ocurra no debe grabarse esa factura y
 debe emitirse un error en pantalla.
 */
+
+-- Mi idea es hacer una funcion que reciba dos productos y que devuelva si es de la misma familia
+-- el primer producto sería fijo y el segundo es el que compararía sucesivamente 
+-- luego haría un sum de esa tabla y si es > 0 es xq hay alguna que no es de la misma familia
+-- ahi hace rollback de esa factura y pasa a la siguiente (creo que no t podés salvar del cursor)
+
+create trigger ej21 ON Factura AFTER INSERT 
+AS
+BEGIN 
+	
+END
+
 /*
 22. Se requiere recategorizar los rubros de productos, de forma tal que nigun rubro
 tenga más de 20 productos asignados, si un rubro tiene más de 20 productos
