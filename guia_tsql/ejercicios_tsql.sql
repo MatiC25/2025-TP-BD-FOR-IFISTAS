@@ -221,7 +221,45 @@ verifique que no exista stock y si es así lo borre en caso contrario que emita 
 mensaje de error.
 */
 
-	-- == CLASE PREENCIAL ==
+create trigger ej10 on Producto AFTER DELETE 
+AS 
+BEGIN
+	if((SELECT COUNT(*) FROM Deleted JOIN STOCK ON stoc_producto = producto WHERE stoc_cantidad > 0) > 0)
+	BEGIN
+		ROLLBACK
+		RAISERROR('No se pueden deletear productos con STOCK')
+	END
+END
+
+/* Si queremos borrar los que se puedan borrar */
+
+create trigger ej10 on Producto AFTER DELETE 
+AS 
+BEGIN
+	DELETE FROM Producto WHERE prod_codigo IN (SELECT prod_codigo FROM Deleted NOT IN (SELECT DISTINCT stoc_producto FROM STOCK WHERE stoc_cantidad > 0))
+END
+
+/* Si queremos borrar los que se puedan e informar los que no borre*/
+
+create trigger ej10 on Producto AFTER DELETE 
+AS 
+BEGIN
+	declare @prod char(8)
+	DELETE FROM Producto WHERE prod_codigo IN (SELECT prod_codigo FROM Deleted NOT IN (SELECT DISTINCT stoc_producto FROM STOCK WHERE stoc_cantidad > 0))
+	declare c1 cursor for SELECT DISTINCT stoc_producto FROM Deleted JOIN STOCK ON stoc_producto = prod_codigo WHERE stoc_cantidad > 0
+	open c1
+	fetch next from c1 into @prod
+	WHILE @@FETCH_STATUS = 0
+	BEGIN 
+		PRINT ('El producto' + @prod + 'no se puede borrar dado que tiene stock')
+		fetch next from c1 into @prod
+	END
+	close c1 
+	deallocate c1
+
+END
+
+	-- == CLASE PRESENCIAL ==
 /*
 11. Cree el/los objetos de base de datos necesarios para que dado un código de
 empleado se retorne la cantidad de empleados que este tiene a su cargo (directa o
@@ -234,7 +272,7 @@ returns decimal(12,2)
 as
 BEGIN
 	declare @cant decimal(12,2), @emplaux numeric(6)
-	declare empl_cur cursor for select empl_codigo from Empleado where empl_jefe = @empleado
+	declare empl_cur cursor for select empl_codigo from Empleado where empl_jefe > @empleado
 																
 	open empl_cur
 	fetch next from empl_cur into @emplaux
@@ -724,6 +762,29 @@ BEGIN
 
 END
 
+
+CREATE PROCEDURE ej20 
+AS
+BEGIN
+    UPDATE e
+    SET empl_comision = 
+        CASE 
+            WHEN C.cantProd >= 50 THEN C.totalVenta * 0.08
+            ELSE C.totalVenta * 0.05
+        END
+    FROM Empleado e
+    JOIN (SELECT fact_vendedor AS empl_codigo, 
+               SUM(fact_total) AS totalVenta, 
+               COUNT(DISTINCT item_producto) AS cantProd
+        FROM Factura
+        JOIN Item_Factura 
+            ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+        WHERE YEAR(fact_fecha) = YEAR(GETDATE()) 
+          AND MONTH(fact_fecha) = MONTH(GETDATE())
+        GROUP BY fact_vendedor) c
+    ON e.empl_codigo = c.empl_codigo
+END
+
 /*
 21. Desarrolle el/los elementos de base de datos necesarios para que se cumpla
 automaticamente la regla de que en una factura no puede contener productos de
@@ -731,15 +792,27 @@ diferentes familias. En caso de que esto ocurra no debe grabarse esa factura y
 debe emitirse un error en pantalla.
 */
 
--- Mi idea es hacer una funcion que reciba dos productos y que devuelva si es de la misma familia
--- el primer producto sería fijo y el segundo es el que compararía sucesivamente 
--- luego haría un sum de esa tabla y si es > 0 es xq hay alguna que no es de la misma familia
--- ahi hace rollback de esa factura y pasa a la siguiente (creo que no t podés salvar del cursor)
-
-create trigger ej21 ON Factura AFTER INSERT 
-AS
+create trigger ej21 ON Factura AFTER INSERT
+AS 
 BEGIN 
-	
+	declare @tipo char(1), @sucu char(4), @num char(8)
+	create c1 cursor for SELECT fact_tipo, fact_sucursal, fact_numero FROM Inserted
+	open c1
+	fetch next from c1 into @tipo, @sucu, @num
+
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		if((SELECT COUNT(distinct prod_familia) FROM Inserted
+			JOIN Item_Factura ON @tipo + @sucu + @num=item_tipo+item_sucursal+item_numero
+			JOIN Producto ON item_producto=prod_codigo) > 1) 
+		BEGIN
+			ROLLBACK
+			RAISERROR('No se puede emitir la factura')
+		END
+		fetch next from c1 into @tipo, @sucu, @num
+	END
+	close c1 
+	deallocate c1
 END
 
 /*
@@ -750,11 +823,73 @@ productos y si no entran se debra crear un nuevo rubro en la misma familia con
 la descirpción “RUBRO REASIGNADO”, cree el/los objetos de base de datos
 necesarios para que dicha regla de negocio quede implementada.
 */
+
+create procedure ej22 
+AS
+BEGIN
+	declare @rubro char(4), @familia char(3)
+	create c1 cursor for SELECT rubr_id, prod_familia
+								FROM Rubro 
+								JOIN Producto on prod_rubro = rubr_id
+								GROUP BY rubr_id, prod_familia
+								HAVING COUNT(distinct prod_codigo) > 20
+	open c1
+	fetch next from c1 into @rubro, @familia 
+
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		declare @sobrantes decimal(12,2)
+		SELECT @sobrantes = (COUNT(distinct prod_codigo) - 20) 
+		FROM Producto WHERE prod_rubro = @rubro
+
+		declare @prodaux char(8)
+		create c2 cursor for SELECT TOP @sobrantes prod_codigo 
+								FROM Producto WHERE prod_rubro = @rubro
+		open c2 
+		fetch next from c2 into @prodaux 
+		WHILE @@FETCH_STATUS = 0
+		BEGIN 
+			declare @nuevoRubro char(4)
+			SELECT TOP 1 @nuevoRubro = prod_rubro
+								FROM Producto
+								WHERE prod_familia = @familia AND prod_rubro <> @rubro AND COUNT(distinct prod_codigo) < 20
+								GROUP BY prod_rubro
+								ORDER BY COUNT(distinct prod_codigo) ASC
+		    
+			if (@nuevo_rubro IS NULL)
+            BEGIN
+                SELECT TOP 1 @nuevo_rubro = rubr_id + 1
+                FROM Rubro
+				ORDER BY rubr_id DESC
+
+                INSERT INTO Rubro(rubr_id, rubr_detalle)
+                VALUES (@nuevo_rubro, 'RUBRO REASIGNADO');
+            END
+
+            UPDATE Producto
+            SET prod_rubro = @nuevo_rubro
+            WHERE prod_codigo = @prod_codigo;
+
+			fetch next from c2 into @prodaux 
+
+		END
+
+		fetch next from c1 into @rubro, @familia 
+	END
+	close c1
+	deallocate
+	
+END
+
+
+
 /*
 23. Desarrolle el/los elementos de base de datos necesarios para que ante una venta
 automaticamante se controle que en una misma factura no puedan venderse más
 de dos productos con composición. Si esto ocurre debera rechazarse la factura.
 */
+
+
 /*
 24. Se requiere recategorizar los encargados asignados a los depositos. Para ello
 cree el o los objetos de bases de datos necesarios que lo resueva, teniendo en
