@@ -484,61 +484,76 @@ del año.
 El resultado deberá ser ordenado por el total vendido por año en forma descendente.
 */
 
+SELECT 
+	YEAR(f.fact_fecha),
+	(SELECT TOP 1 item_producto 
+	FROM Item_Factura
+	JOIN Factura ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+	JOIN Composicion ON item_producto = comp_producto
+	WHERE YEAR(fact_fecha) = YEAR(f.fact_fecha)
+	GROUP BY item_producto 
+	ORDER BY SUM(item_cantidad) DESC),
+	(SELECT COUNT(*) FROM Composicion
+	WHERE comp_producto = (SELECT TOP 1 item_producto 
+							FROM Item_Factura
+							JOIN Composicion ON item_producto = comp_producto
+							GROUP BY item_producto 
+							ORDER BY SUM(item_cantidad) DESC)),
+	(SELECT COUNT(distinct fact_tipo+fact_sucursal+fact_numero) 
+	FROM Factura
+	JOIN Item_Factura ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+	WHERE YEAR(fact_fecha) = YEAR(f.fact_fecha) AND item_producto = (SELECT TOP 1 item_producto 
+																	FROM Item_Factura
+																	JOIN Composicion ON item_producto = comp_producto
+																	GROUP BY item_producto 
+																	ORDER BY SUM(item_cantidad) DESC)),
+	(SELECT TOP 1 fact_cliente 
+	FROM Factura
+	JOIN Item_Factura ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+	WHERE item_producto = (SELECT TOP 1 item_producto 
+							FROM Item_Factura
+							JOIN Composicion ON item_producto = comp_producto
+							GROUP BY item_producto 
+							ORDER BY SUM(item_cantidad) DESC) AND YEAR(fact_fecha) = YEAR(f.fact_fecha)
+	GROUP BY fact_cliente
+	ORDER BY SUM(item_cantidad)),
+	(SELECT SUM(item_cantidad*item_precio) 
+	FROM Item_Factura
+	JOIN Factura ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+	WHERE YEAR(fact_fecha) = YEAR(f.fact_fecha) AND item_producto = (SELECT TOP 1 item_producto 
+							FROM Item_Factura
+							JOIN Composicion ON item_producto = comp_producto
+							GROUP BY item_producto 
+							ORDER BY SUM(item_cantidad) DESC )) * 100 / SUM(fact_total)
+FROM Factura f
+GROUP BY YEAR(f.fact_fecha)
 
+-- Otra Solución más limpia --
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-SELECT distinct YEAR(fact_fecha), (SELECT TOP 1 item_producto 
-									FROM Factura f2
-									JOIN Item_Factura ON f2.fact_tipo+f2.fact_sucursal+f2.fact_numero=item_tipo+item_sucursal+item_numero
-									JOIN Producto ON item_producto = prod_codigo
-									WHERE prod_codigo in (SELECT comp_producto FROM Composicion) AND YEAR(f1.fact_fecha) = YEAR(f2.fact_fecha)
-									group by item_producto
-									order by COUNT(*) desc) as ProductoMasVendido
-									, (SELECT COUNT(*)
-										FROM Composicion 
-										WHERE comp_producto = (SELECT TOP 1 item_producto 
-									FROM Factura f2
-									JOIN Item_Factura ON f2.fact_tipo+f2.fact_sucursal+f2.fact_numero=item_tipo+item_sucursal+item_numero
-									JOIN Producto ON item_producto = prod_codigo
-									WHERE prod_codigo in (SELECT comp_producto FROM Composicion) AND YEAR(f1.fact_fecha) = YEAR(f2.fact_fecha)
-									group by item_producto
-									order by COUNT(*) desc)) as CantProductosCompuesto
-									, (SELECT TOP 1 fact_cliente 
-										FROM Factura
-										JOIN Item_Factura ON fact_tipo+fact_sucursal+fact_numero=item_tipo+item_sucursal+item_numero
-									WHERE item_producto = (SELECT TOP 1 item_producto 
-									FROM Factura f2
-									JOIN Item_Factura ON f2.fact_tipo+f2.fact_sucursal+f2.fact_numero=item_tipo+item_sucursal+item_numero
-									JOIN Producto ON item_producto = prod_codigo
-									WHERE prod_codigo in (SELECT comp_producto FROM Composicion) AND YEAR(f1.fact_fecha) = YEAR(f2.fact_fecha)
-									group by item_producto
-									order by COUNT(*) desc)						
-									group by fact_cliente 
-									order by SUM(item_cantidad)) as clienteMasCompro
-FROM Factura f1 
+SELECT 
+	YEAR(f.fact_fecha),
+	i.item_producto, 
+	COUNT(DISTINCT comp_producto),
+	COUNT(DISTINCT fact_tipo+fact_sucursal+fact_numero),
+	(SELECT TOP 1 fact_cliente 
+	FROM Factura
+	JOIN Item_Factura ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+	WHERE item_producto = i.item_producto AND YEAR(f.fact_fecha) = YEAR(fact_fecha)
+	GROUP BY fact_cliente
+	ORDER BY SUM(item_cantidad)),
+	AVG(item_cantidad * item_precio)
+FROM Factura f
+JOIN Item_Factura i ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+JOIN Producto ON item_producto = prod_codigo 
+JOIN Composicion ON comp_producto = prod_codigo
+GROUP BY YEAR(f.fact_fecha), item_producto
+HAVING item_producto IN (SELECT TOP 1 item_producto 
+							FROM Item_Factura
+							JOIN Factura ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+							JOIN Composicion ON item_producto = comp_producto
+							WHERE YEAR(fact_fecha) = YEAR(f.fact_fecha)
+							GROUP BY item_producto 
+							ORDER BY SUM(item_cantidad) DESC)
 
 
 
@@ -553,9 +568,11 @@ El resultado deberá ser ordenado por las unidades facturadas descendente. */
 
 SELECT prod_codigo, prod_detalle, SUM(item_cantidad) as unidadesFacturadas
 FROM Factura
-JOIN Item_Factura ON fact_tipo+fact_sucursal+fact_numero=item_tipo+item_sucursal+item_numero AND  fact_vendedor IN (SELECT TOP 2 empl_codigo
-																													FROM Empleado
-																													order by empl_comision desc)
+JOIN Item_Factura ON fact_tipo+fact_sucursal+fact_numero=item_tipo+item_sucursal+item_numero 
+AND  
+fact_vendedor IN (SELECT TOP 2 empl_codigo
+					FROM Empleado
+					order by empl_comision desc)
 JOIN Producto on item_producto = prod_codigo
 GROUP BY prod_codigo, prod_detalle
 HAVING COUNT(fact_numero) > 5
@@ -575,10 +592,45 @@ del año.
 El resultado deberá ser ordenado por el total vendido por año y familia en forma
 descendente. */
 
+-- Solución válida: --
 
 SELECT 
 	YEAR(f.fact_fecha),
+	p.prod_familia,
+	COUNT(DISTINCT prod_rubro),
+	(SELECT COUNT (*) 
+	FROM Composicion 
+	WHERE comp_producto = (SELECT TOP 1 item_producto 
+							FROM Item_Factura
+							JOIN Producto ON item_producto = prod_codigo
+							WHERE prod_familia = p.prod_familia
+							GROUP BY item_producto
+							ORDER BY SUM(item_cantidad) DESC)),
+	COUNT(DISTINCT fact_tipo+fact_sucursal+fact_numero),
+	(SELECT TOP 1 fact_cliente
+	FROM Factura
+	JOIN Item_Factura ON fact_tipo+fact_sucursal+fact_numero=item_tipo+item_sucursal+item_numero
+	JOIN Producto ON item_producto = prod_codigo
+	WHERE prod_familia = p.prod_familia AND YEAR(fact_fecha) = YEAR(f.fact_fecha)
+	GROUP BY fact_cliente
+	ORDER BY SUM(item_cantidad*item_precio) DESC),
+	AVG(item_cantidad * item_precio)
+FROM Factura f 
+JOIN Item_Factura ON fact_tipo+fact_sucursal+fact_numero=item_tipo+item_sucursal+item_numero
+JOIN Producto p ON item_producto = prod_codigo
+GROUP BY YEAR(f.fact_fecha), prod_familia
+HAVING prod_familia IN (SELECT TOP 1 prod_familia
+	FROM Factura
+    JOIN Item_Factura ON fact_tipo+fact_sucursal+fact_numero=item_tipo+item_sucursal+item_numero
+    JOIN Producto ON item_producto = prod_codigo
+    WHERE YEAR(fact_fecha) = YEAR(f.fact_fecha)
+    GROUP BY prod_familia
+    ORDER BY COUNT(fact_numero) DESC)
 
+-- La solución del profe: --
+
+SELECT 
+	YEAR(f.fact_fecha),
 	(SELECT TOP 1 prod_familia
 	FROM Factura f1
     JOIN Item_Factura ON f1.fact_tipo+f1.fact_sucursal+f1.fact_numero=item_tipo+item_sucursal+item_numero
@@ -621,7 +673,8 @@ SELECT
                             WHERE YEAR(f1.fact_fecha) = YEAR(f.fact_fecha)
                             GROUP BY prod_familia
                             ORDER BY SUM(item_cantidad)  DESC)) AS CantFacturas,
-	(SELECT TOP 1 fact_cliente FROM Factura
+	(SELECT TOP 1 fact_cliente 
+	FROM Factura
 	JOIN Item_Factura ON fact_tipo+fact_sucursal+fact_numero=item_tipo+item_sucursal+item_numero
 	JOIN Producto ON prod_codigo = item_producto
 	WHERE YEAR(f.fact_fecha) = YEAR(fact_fecha) AND prod_familia = (SELECT TOP 1 prod_familia
