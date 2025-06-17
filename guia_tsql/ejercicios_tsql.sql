@@ -882,13 +882,23 @@ BEGIN
 END
 
 
-
 /*
 23. Desarrolle el/los elementos de base de datos necesarios para que ante una venta
 automaticamante se controle que en una misma factura no puedan venderse más
 de dos productos con composición. Si esto ocurre debera rechazarse la factura.
 */
 
+-- == Empezar de nuevo, decidir si es AFTER INSERT O Instead OF
+create trigger ej23 ON Factura INSTEAD OF INSERT
+AS
+BEGIN 
+	SELECT fact_numero
+						FROM INSERTED
+						JOIN Item_Factura ON item_tipo+item_sucursal+item_numero=fact_tipo+fact_sucursal+fact_numero
+						JOIN Composicion ON item_producto=comp_producto
+						GROUP BY fact_numero
+						HAVING COUNT(distinct item_producto) > 2)
+END
 
 /*
 24. Se requiere recategorizar los encargados asignados a los depositos. Para ello
@@ -898,12 +908,43 @@ pertenezca a un departamento que no sea de la misma zona que el deposito, si
 esto ocurre a dicho deposito debera asignársele el empleado con menos
 depositos asignados que pertenezca a un departamento de esa zona.
 */
+
+CREATE procedure 
+AS
+BEGIN 
+	declare @emplAux numeric(6), @depoAux char(2)
+	create c1 cursor for SELECT empl_codigo, depo_codigo
+							FROM Empleado 
+							JOIN Departamento ON depa_codigo = empl_departamento
+							JOIN Deposito ON depo_encargado = empl_codigo
+							WHERE depa_zona <> depo_zona
+	open c1
+	fetch next from c1 into @emplAux, @depoAux
+	WHILE @@FETCH_STATUS = 0
+	BEGIN 
+		declare @nuevoEmpl numeric(6)
+		SELECT @nuevoEmpl = empl_codigo
+							FROM Empleado 
+							JOIN Departamento ON depa_codigo = empl_departamento
+							JOIN Deposito ON depo_encargado = empl_codigo
+							WHERE depa_zona = depo_zona
+							ORDER BY COUNT(depo_codigo) DESC
+
+		update Deposito set depo_encargado = @nuevoEmpl WHERE depo_codigo = @depoAux
+		fetch next from c1 into @emplAux, @depoAux
+	END
+	close c1
+	deallocate c1 
+
+END
+
 /*
 25. Desarrolle el/los elementos de base de datos necesarios para que no se permita
 que la composición de los productos sea recursiva, o sea, que si el producto A
 compone al producto B, dicho producto B no pueda ser compuesto por el
 producto A, hoy la regla se cumple.
 */
+
 /*
 26. Desarrolle el/los elementos de base de datos necesarios para que se cumpla
 automaticamente la regla de que una factura no puede contener productos que
@@ -921,6 +962,7 @@ deberán ir asignando tratando de que un empleado solo tenga un deposito
 asignado, en caso de no poder se irán aumentando la cantidad de depósitos
 progresivamente para cada empleado.
 */
+
 /*
 28. Se requiere reasignar los vendedores a los clientes. Para ello se solicita que
 realice el o los objetos de base de datos necesarios para asignar a cada uno de los
