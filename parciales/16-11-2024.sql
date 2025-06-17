@@ -13,8 +13,8 @@ El resultado debe estar ordenado por la cantidad total comprada de mayor a menor
 
 -- ========== T-SQL ========== --
 
-/* 2. Implementar los onjetos necesarios para registrar, en tiempo real, los 10 productos
-más vendidos por alo en una tabla especifica. Esta tabla debe contener exclusivamente la info requerida
+/* 2. Implementar los objetos necesarios para registrar, en tiempo real, los 10 productos
+más vendidos por año en una tabla especifica. Esta tabla debe contener exclusivamente la info requerida
 sin incluir filas adicionales. Los más vendidos se define como aquellos productos con el mayor
 numero de unidades vendidas.
 */
