@@ -14,7 +14,16 @@ GROUP BY MONTH(T.tiem_fecha),
 GO
 
 -- -- == Vista Facturación Promedio Mensual == --
-
+CREATE VIEW FORIF_ISTAS.Factura_Promedio
+AS
+SELECT YEAR(T.tiem_fecha) AS Año,
+	   T.tiem_cuatri AS Cuatrimestre, 
+	   U.ubic_localidad AS Localidad,
+	   SUM(V.hecho_venta_total) / V.hecho_venta_cantidad AS Promedio
+FROM FORIF_ISTAS.HechoVenta V
+JOIN FORIF_ISTAS.DimUbicacion U ON U.ubic_id = V.hecho_venta_ubicacion
+JOIN FORIF_ISTAS.DimTiempo T ON T.tiem_id = V.hecho_venta_tiempo
+GROUP BY T.tiem_cuatri, YEAR(T.tiem_fecha), U.ubic_localidad, V.hecho_venta_cantidad
 
 -- -- == Vista Rendimiento de Modelos == --
 CREATE VIEW FORIF_ISTAS.Rendimiento_Modelos
@@ -35,3 +44,5 @@ WHERE M.mode_sillon_id IN (SELECT TOP 3 hecho_venta_sillon_modelo
 						   ORDER BY SUM(hecho_venta_cantidad) DESC)
 GROUP BY T.tiem_cuatri, YEAR(T.tiem_fecha), U.ubic_localidad, v.hecho_venta_rango_etario, M.mode_sillon_nombre
 GO
+
+
