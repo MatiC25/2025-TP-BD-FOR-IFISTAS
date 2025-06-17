@@ -70,6 +70,14 @@ BEGIN
     UNION
     
     SELECT DISTINCT
+        envi_fecha_entrega,
+        DATEPART(QUARTER, envi_fecha_entrega)
+    FROM FORIF_ISTAS.Envio
+    WHERE envi_fecha_entrega IS NOT NULL
+
+    UNION
+    
+    SELECT DISTINCT
         comp_fecha,
         DATEPART(QUARTER, comp_fecha)
     FROM FORIF_ISTAS.Compra
@@ -263,7 +271,7 @@ GO
 -- == Hecho Venta == --
 
 CREATE TABLE FORIF_ISTAS.HechoVenta (
-    hecho_venta_numero INT NOT NULL,
+    hecho_venta_cantidad INT NOT NULL,
     hecho_venta_sucursal INT NOT NULL, 
     hecho_venta_sillon_modelo INT NOT NULL, -- FOREIGN KEY REFERENCES DimModeloSillon(mode_sillon_id)
     hecho_venta_total DECIMAL(10, 2) NOT NULL,
@@ -294,16 +302,16 @@ BEGIN
         hecho_venta_sillon_modelo,
         hecho_venta_total,
         hecho_venta_ubicacion,
-        hecho_venta_numero
+        hecho_venta_cantidad
     )
-    SELECT
+        SELECT
         rang_etario_id,
         tiem_id,
         fact_sucursal, 
         mode_sillon_id, 
-        fact_total,
+        SUM(ISNULL(fact_total, 0)) AS total_factura,
         ubic_id,
-        fact_numero
+        COUNT(*) AS cant_facturas
     FROM FORIF_ISTAS.Factura
     JOIN FORIF_ISTAS.Item_Factura ON item_f_numero_factura = fact_numero
     JOIN FORIF_ISTAS.Sillon ON item_f_sillon = sill_codigo
@@ -316,6 +324,12 @@ BEGIN
     JOIN FORIF_ISTAS.DimTiempo ON tiem_fecha = fact_fecha_hora
     JOIN FORIF_ISTAS.DimRangoEtario ON rang_etario_inicio <= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora) AND rang_etario_fin >= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora)
     JOIN FORIF_ISTAS.DimModeloSillon ON mode_sillon_nombre = mode_descripcion
+    GROUP BY rang_etario_id,
+             tiem_id,
+             fact_sucursal, 
+             mode_sillon_id, 
+             ubic_id
+
 END
 GO
 EXEC FORIF_ISTAS.Migracion_HechoVenta
@@ -374,16 +388,13 @@ EXEC FORIF_ISTAS.Migracion_HechoCompra
 GO
 
 
-
-
 -- -- == Hecho Envio == --
 
 CREATE TABLE FORIF_ISTAS.HechoEnvio (
     hecho_envio_tiempo INT NOT NULL, -- FOREIGN KEY REFERENCES DimTiempo(tiem_id)
     hecho_envio_ubicacion INT NOT NULL, -- FOREIGN KEY REFERENCES DimUbicacion(ubicacion_id)
-    hecho_envio_numero INT NOT NULL,
-    hecho_envio_fecha_entrega DATETIME2,
-    hecho_envio_fecha_programada DATETIME2
+    hecho_envio_cantidad_total INT NOT NULL,
+    hecho_envio_cantidad_en_forma INT NOT NULL
 )
 
 GO
@@ -401,25 +412,34 @@ BEGIN
     INSERT INTO FORIF_ISTAS.HechoEnvio (
         hecho_envio_tiempo,
         hecho_envio_ubicacion,
-        hecho_envio_numero,
-        hecho_envio_fecha_entrega,
-        hecho_envio_fecha_programada
+        hecho_envio_cantidad_total,
+        hecho_envio_cantidad_en_forma
     )
     
     SELECT DISTINCT
-        tiem_id,
-        ubic_id,
-        envi_numero,
-        envi_fecha_programada,
-        envi_fecha_programada
+        t.tiem_id,
+        u.ubic_id,
+        COUNT(*) as cantTotal,
+        ISNULL((SELECT COUNT(*) 
+        FROM FORIF_ISTAS.Envio 
+        JOIN FORIF_ISTAS.Factura ON fact_envio = envi_numero 
+        JOIN FORIF_ISTAS.Cliente ON  fact_cliente = clie_codigo
+        JOIN FORIF_ISTAS.Direccion ON clie_direccion =  dire_codigo
+        JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
+        JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
+        JOIN FORIF_ISTAS.DimTiempo ON tiem_fecha = envi_fecha_programada OR tiem_fecha = envi_fecha_entrega
+        JOIN FORIF_ISTAS.DimUbicacion ON ubic_provincia = prov_nombre AND ubic_localidad = loca_nombre
+        WHERE envi_fecha_entrega <= envi_fecha_programada AND tiem_id = t.tiem_id AND ubic_id = u.ubic_id
+        GROUP BY tiem_id, ubic_id), 0) as cantEnForma
     FROM FORIF_ISTAS.Envio 
     JOIN FORIF_ISTAS.Factura ON fact_envio = envi_numero 
     JOIN FORIF_ISTAS.Cliente ON  fact_cliente = clie_codigo
     JOIN FORIF_ISTAS.Direccion ON clie_direccion =  dire_codigo
     JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
     JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
-    JOIN FORIF_ISTAS.DimTiempo ON tiem_fecha = envi_fecha_programada
-    JOIN FORIF_ISTAS.DimUbicacion ON ubic_provincia = prov_nombre and ubic_localidad = loca_nombre
+    JOIN FORIF_ISTAS.DimTiempo t ON t.tiem_fecha = envi_fecha_programada OR t.tiem_fecha = envi_fecha_entrega
+    JOIN FORIF_ISTAS.DimUbicacion u ON u.ubic_provincia = prov_nombre AND u.ubic_localidad = loca_nombre
+    GROUP BY t.tiem_id, u.ubic_id
 END
 GO 
 EXEC FORIF_ISTAS.Migracion_HechoEnvio
@@ -432,7 +452,7 @@ CREATE TABLE FORIF_ISTAS.HechoPedido (
     hecho_pedido_tiempo INT NOT NULL, -- FOREIGN KEY REFERENCES DimTiempo(tiem_id)
     hecho_pedido_turno INT NOT NULL, -- FOREIGN KEY REFERENCES DimTurnoVentas(turn_id)
     hecho_pedido_sucursal INT NOT NULL,
-    hecho_pedido_numero INT NOT NULL
+    hecho_pedido_cantidad INT NOT NULL
 )
 GO
 ALTER TABLE FORIF_ISTAS.HechoPedido ADD CONSTRAINT FK_hecho_pedido_estado FOREIGN KEY (hecho_pedido_estado) REFERENCES FORIF_ISTAS.DimEstadoPedido (esta_pedido_id)
@@ -453,19 +473,22 @@ BEGIN
         hecho_pedido_sucursal,
         hecho_pedido_turno,
         hecho_pedido_tiempo,
-        hecho_pedido_numero
+        hecho_pedido_cantidad
     )
-    
     SELECT DISTINCT 
         esta_pedido_id,
         pedi_sucursal,
         turn_id,
         tiem_id,    
-        pedi_numero
+        COUNT(*)
     FROM FORIF_ISTAS.Pedido
     JOIN FORIF_ISTAS.DimTurnoVentas ON CAST(pedi_fecha_hora AS TIME) >= turn_hora_inicio AND CAST(pedi_fecha_hora AS TIME) <= turn_hora_fin
     JOIN FORIF_ISTAS.DimEstadoPedido ON pedi_estado = esta_pedido_nombre
     JOIN FORIF_ISTAS.DimTiempo ON pedi_fecha_hora = tiem_fecha
+    GROUP BY esta_pedido_id,
+             pedi_sucursal,
+             turn_id,
+             tiem_id
 END
 GO
 EXEC FORIF_ISTAS.Migracion_HechoPedido

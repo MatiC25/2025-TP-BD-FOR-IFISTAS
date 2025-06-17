@@ -189,7 +189,7 @@ BEGIN
         hecho_venta_ubicacion,
         hecho_venta_numero
     )
-    SELECT DISTINCT (
+    SELECT DISTINCT
         rang_etario_id,
         tiem_id,
         fact_sucursal,
@@ -197,7 +197,6 @@ BEGIN
         fact_total,
         ubic_id,
         fact_numeroo
-    )
     FROM Factura
     JOIN Item_Compra ON item_c_numero = fact_numero
     JOIN Cliente ON fact_cliente = clie_numero
@@ -225,13 +224,11 @@ BEGIN
         hecho_compra_total
     )
     
-    SELECT DISTINCT (
+    SELECT DISTINCT
         tiem_id,
         ubic_id,
         tipo_material_id,
         SUM(ISNULL(comp_total, 0))
-    )
-    
     FROM Compra
     JOIN Sucursal ON comp_sucursal = sucu_numero
     JOIN Direccion ON dire_codigo = sucu_direccion
@@ -267,11 +264,11 @@ BEGIN
         hecho_envio_porcentaje
     )
     
-    SELECT DISTINCT (
+    SELECT DISTINCT
         tiem_id,
         ubic_id,
         COUNT(CASE WHEN envi_fecha_entrega = envi_fecha_programada THEN 1 END) * 100.0 / COUNT(*)
-    )
+
     FROM Envio 
     JOIN Factura ON fact_envio = envi_numero -- A chequear
     JOIN Cliente ON  fact_cliente = clie_codigo

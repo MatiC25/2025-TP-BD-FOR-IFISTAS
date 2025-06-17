@@ -39,6 +39,7 @@ el precio del mismo producto que hace 12 meses atrás. Aquellos productos nuevos
 no debe considerar esta regla ya que no hay precio de referencia
 */
 
+
 CREATE TRIGGER contextoInflacionario ON Factura AFTER INSERT 
 AS
 BEGIN
