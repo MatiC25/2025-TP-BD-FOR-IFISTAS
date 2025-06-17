@@ -343,13 +343,16 @@ CREATE TABLE FORIF_ISTAS.HechoCompra (
     hecho_compra_tiempo INT NOT NULL, -- FOREIGN KEY REFERENCES DimTiempo(tiem_id)
     hecho_compra_ubicacion INT NOT NULL,
     hecho_compra_tipo_material INT NOT NULL, -- FOREIGN KEY REFERENCES DimTipoMaterial(tipo_material_id)
+    hecho_compra_sucursal INT NOT NULL,
     hecho_compra_precio_material DECIMAL(10, 2) NOT NULL,
 )
 GO
 
 ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_tiempo FOREIGN KEY (hecho_compra_tiempo) REFERENCES FORIF_ISTAS.DimTiempo
 GO
-ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_sucursal FOREIGN KEY (hecho_compra_ubicacion) REFERENCES FORIF_ISTAS.DimUbicacion
+ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_ubicacion FOREIGN KEY (hecho_compra_ubicacion) REFERENCES FORIF_ISTAS.DimUbicacion
+GO
+ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_sucursal FOREIGN KEY (hecho_compra_sucursal) REFERENCES FORIF_ISTAS.DimUbicacion
 GO
 ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_tipo_material FOREIGN KEY (hecho_compra_tipo_material) REFERENCES FORIF_ISTAS.DimTipoMaterial
 GO
@@ -363,6 +366,7 @@ BEGIN
         hecho_compra_tiempo,
         hecho_compra_ubicacion,
         hecho_compra_tipo_material,
+        hecho_compra_sucursal,
         hecho_compra_precio_material
     )
     
@@ -370,6 +374,7 @@ BEGIN
         tiem_id,
         ubic_id,
         tipo_material_id,
+        comp_sucursal,
         mate_precio
     FROM FORIF_ISTAS.Compra
     JOIN FORIF_ISTAS.Sucursal ON comp_sucursal = sucu_numero
