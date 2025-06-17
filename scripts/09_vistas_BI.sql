@@ -1,5 +1,4 @@
--- -- == Vistas == --
--- Ganancias: total de ingresos (facturacion) - total de egresos (compras), por cada mes y por cada sucursal
+-- -- == Vista Ganancias == --
 CREATE VIEW FORIF_ISTAS.Ganancias
 AS
 SELECT MONTH(T.tiem_fecha) AS Mes,
@@ -14,5 +13,25 @@ GROUP BY MONTH(T.tiem_fecha),
          V.hecho_venta_sucursal
 GO
 
-SELECT * FROM FORIF_ISTAS.Ganancias
--- No usamos una vista materializada ya que ésta no acepta funciones de agrupación como SUM ni RIGHT/LEFT JOINs
+-- -- == Vista Facturación Promedio Mensual == --
+
+
+-- -- == Vista Rendimiento de Modelos == --
+CREATE VIEW FORIF_ISTAS.Rendimiento_Modelos
+AS
+SELECT T.tiem_cuatri AS Cuatrimestre, 
+	   YEAR(T.tiem_fecha) AS Año, 
+	   U.ubic_localidad AS Localidad,  
+	   v.hecho_venta_rango_etario AS Rango_Etario,
+	   M.mode_sillon_nombre AS Modelo
+FROM FORIF_ISTAS.HechoVenta V
+JOIN FORIF_ISTAS.DimModeloSillon M ON M.mode_sillon_id = V.hecho_venta_sillon_modelo
+JOIN FORIF_ISTAS.DimTiempo T ON T.tiem_id = V.hecho_venta_tiempo
+JOIN FORIF_ISTAS.DimUbicacion U ON U.ubic_id = V.hecho_venta_ubicacion
+WHERE M.mode_sillon_id IN (SELECT TOP 3 hecho_venta_sillon_modelo
+						   FROM FORIF_ISTAS.HechoVenta V2
+						   WHERE V2.hecho_venta_tiempo = t.tiem_id AND V2.hecho_venta_ubicacion = V.hecho_venta_ubicacion
+						   GROUP BY hecho_venta_sillon_modelo
+						   ORDER BY SUM(hecho_venta_cantidad) DESC)
+GROUP BY T.tiem_cuatri, YEAR(T.tiem_fecha), U.ubic_localidad, v.hecho_venta_rango_etario, M.mode_sillon_nombre
+GO
