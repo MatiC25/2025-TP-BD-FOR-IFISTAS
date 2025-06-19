@@ -1,4 +1,4 @@
---- == MATI == -- 
+--- == LEO == --
 -- -- == Vista Ganancias == --
 CREATE VIEW FORIF_ISTAS.Ganancias
 AS
@@ -46,6 +46,7 @@ WHERE M.mode_sillon_id IN (SELECT TOP 3 hecho_venta_sillon_modelo
 GROUP BY T.tiem_cuatri, YEAR(T.tiem_fecha), U.ubic_localidad, v.hecho_venta_rango_etario, M.mode_sillon_nombre
 GO
 
+--- == MATI == -- 
 -- == Vista 4,5,6 == --
 /*
 4. VolumenDePedidos: Cantidad de pedidos registrados por turno, por sucursal
@@ -179,7 +180,6 @@ ORDER BY anio, mes
 SELECT anio, mes, (CAST(suma_envios_en_forma AS FLOAT) /suma_envios_totales) * 100 AS promedio_envios_cumplidos
 FROM FORIF_ISTAS.mv_prom_envios_cumplidos
 
---- == LEO == --
 
 
 --- == FACU == --
