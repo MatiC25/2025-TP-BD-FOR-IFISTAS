@@ -45,4 +45,50 @@ WHERE M.mode_sillon_id IN (SELECT TOP 3 hecho_venta_sillon_modelo
 GROUP BY T.tiem_cuatri, YEAR(T.tiem_fecha), U.ubic_localidad, v.hecho_venta_rango_etario, M.mode_sillon_nombre
 GO
 
+-- == Vista 4,5,6 == --
+/*
+4. VolumenDePedidos: Cantidad de pedidos registrados por turno, por sucursal
+según el mes del año 
+*/
 
+SELECT turn_id, hecho_pedido_sucursal, MONTH(tiem_fecha) as Mes, YEAR(tiem_fecha) as Año, COUNT(*) as Volumen
+FROM FORIF_ISTAS.HechoPedido
+JOIN FORIF_ISTAS.DimTiempo ON hecho_pedido_tiempo = tiem_id
+JOIN FORIF_ISTAS.DimTurnoVentas ON hecho_pedido_turno = turn_id
+GROUP BY turn_id, hecho_pedido_sucursal, MONTH(tiem_fecha), YEAR(tiem_fecha)
+
+
+/*
+5. ConversionDePedidos: Porcentaje de pedidos según estado, por cuatrimestre y sucursal
+*/
+
+SELECT 
+    CAST(COUNT() AS DECIMAL) / (SELECT COUNT()
+                        FROM FORIF_ISTAS.HechoPedido                
+                        JOIN FORIF_ISTAS.DimTiempo ON hecho_pedido_tiempo = tiem_id
+                        WHERE hecho_pedido_sucursal = p.hecho_pedido_sucursal 
+								AND tiem_cuatri = t.tiem_cuatri
+                        GROUP BY hecho_pedido_sucursal, tiem_cuatri) * 100 AS Porcentaje, 
+    p.hecho_pedido_sucursal, 
+    esta_pedido_nombre, 
+    t.tiem_cuatri
+FROM FORIF_ISTAS.HechoPedido p
+JOIN FORIF_ISTAS.DimEstadoPedido e ON hecho_pedido_estado = esta_pedido_id
+JOIN FORIF_ISTAS.DimTiempo t ON hecho_pedido_tiempo = tiem_id
+GROUP BY hecho_pedido_sucursal, esta_pedido_nombre, tiem_cuatri
+
+
+/*
+6. TiempoPromedioDeFabricacion: tiempo promedio que tarda cada sucursal entre que se registra un pedido
+y registra la factura para el mismo. Por cuatrimestre 
+*/
+
+SELECT 
+    ABS(AVG(DATEDIFF(DAY, hp.hecho_pedido_tiempo, hv.hecho_venta_tiempo))), 
+    hv.hecho_venta_sucursal, 
+    tp.tiem_cuatri
+FROM FORIF_ISTAS.HechoVenta hv
+JOIN FORIF_ISTAS.HechoPedido hp ON hv.hecho_venta_sucursal = hp.hecho_pedido_sucursal
+JOIN FORIF_ISTAS.DimTiempo tv ON hv.hecho_venta_tiempo = tv.tiem_id
+JOIN FORIF_ISTAS.DimTiempo tp ON hp.hecho_pedido_tiempo = tp.tiem_id and tv.tiem_cuatri = tp.tiem_cuatri
+GROUP BY hv.hecho_venta_sucursal, tp.tiem_cuatri
