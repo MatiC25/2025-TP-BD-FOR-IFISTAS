@@ -31,7 +31,7 @@ IF OBJECT_ID('FORIF_ISTAS.Migracion_DimTiempo') IS NOT NULL DROP PROCEDURE FORIF
 CREATE TABLE FORIF_ISTAS.DimTiempo (
     tiem_id INT IDENTITY(1,1), --PRIMARY KEY,
     tiem_fecha DATETIME2 NOT NULL,
-    tiem_cuatri INT NOT NULL
+    tiem_cuatrimestre INT NOT NULL
 )
 GO
 ALTER TABLE FORIF_ISTAS.DimTiempo ADD CONSTRAINT PK_DimTiempo PRIMARY KEY (tiem_id);
@@ -41,7 +41,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO FORIF_ISTAS.DimTiempo (tiem_fecha, tiem_cuatri)
+    INSERT INTO FORIF_ISTAS.DimTiempo (tiem_fecha, tiem_cuatrimestre)
 
     SELECT DISTINCT
         fact_fecha_hora,
@@ -444,7 +444,7 @@ BEGIN
     JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
     JOIN FORIF_ISTAS.DimTiempo t ON t.tiem_fecha = envi_fecha_programada OR t.tiem_fecha = envi_fecha_entrega
     JOIN FORIF_ISTAS.DimUbicacion u ON u.ubic_provincia = prov_nombre AND u.ubic_localidad = loca_nombre
-    GROUP BY t.tiem_id, u.ubic_id
+    GROUP BY t.tiem_id, u.ubic_id, clie_direccion
 END
 GO 
 EXEC FORIF_ISTAS.Migracion_HechoEnvio

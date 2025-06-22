@@ -18,18 +18,19 @@ GO
 CREATE VIEW FORIF_ISTAS.Factura_Promedio
 AS
 SELECT YEAR(T.tiem_fecha) AS Año,
-	   T.tiem_cuatri AS Cuatrimestre, 
+	   T.tiem_cuatrimestre AS Cuatrimestre, 
 	   U.ubic_localidad AS Localidad,
 	   SUM(V.hecho_venta_total) / V.hecho_venta_cantidad AS Promedio
 FROM FORIF_ISTAS.HechoVenta V
 JOIN FORIF_ISTAS.DimUbicacion U ON U.ubic_id = V.hecho_venta_ubicacion
 JOIN FORIF_ISTAS.DimTiempo T ON T.tiem_id = V.hecho_venta_tiempo
-GROUP BY T.tiem_cuatri, YEAR(T.tiem_fecha), U.ubic_localidad, V.hecho_venta_cantidad
+GROUP BY T.tiem_cuatrimestre, YEAR(T.tiem_fecha), U.ubic_localidad, V.hecho_venta_cantidad
+go
 
 -- -- == Vista Rendimiento de Modelos == --
 CREATE VIEW FORIF_ISTAS.Rendimiento_Modelos
 AS
-SELECT T.tiem_cuatri AS Cuatrimestre, 
+SELECT T.tiem_cuatrimestre AS Cuatrimestre, 
 	   YEAR(T.tiem_fecha) AS Año, 
 	   U.ubic_localidad AS Localidad,  
 	   v.hecho_venta_rango_etario AS Rango_Etario,
@@ -43,7 +44,7 @@ WHERE M.mode_sillon_id IN (SELECT TOP 3 hecho_venta_sillon_modelo
 						   WHERE V2.hecho_venta_tiempo = t.tiem_id AND V2.hecho_venta_ubicacion = V.hecho_venta_ubicacion
 						   GROUP BY hecho_venta_sillon_modelo
 						   ORDER BY SUM(hecho_venta_cantidad) DESC)
-GROUP BY T.tiem_cuatri, YEAR(T.tiem_fecha), U.ubic_localidad, v.hecho_venta_rango_etario, M.mode_sillon_nombre
+GROUP BY T.tiem_cuatrimestre, YEAR(T.tiem_fecha), U.ubic_localidad, v.hecho_venta_rango_etario, M.mode_sillon_nombre
 GO
 
 --- == MATI == -- 
@@ -69,15 +70,15 @@ SELECT
                         FROM FORIF_ISTAS.HechoPedido                
                         JOIN FORIF_ISTAS.DimTiempo ON hecho_pedido_tiempo = tiem_id
                         WHERE hecho_pedido_sucursal = p.hecho_pedido_sucursal 
-								AND tiem_cuatri = t.tiem_cuatri
-                        GROUP BY hecho_pedido_sucursal, tiem_cuatri) * 100 AS Porcentaje, 
+								AND tiem_cuatrimestre = t.tiem_cuatrimestre
+                        GROUP BY hecho_pedido_sucursal, tiem_cuatrimestre) * 100 AS Porcentaje, 
     p.hecho_pedido_sucursal, 
     esta_pedido_nombre, 
-    t.tiem_cuatri
+    t.tiem_cuatrimestre
 FROM FORIF_ISTAS.HechoPedido p
 JOIN FORIF_ISTAS.DimEstadoPedido e ON hecho_pedido_estado = esta_pedido_id
 JOIN FORIF_ISTAS.DimTiempo t ON hecho_pedido_tiempo = tiem_id
-GROUP BY hecho_pedido_sucursal, esta_pedido_nombre, tiem_cuatri
+GROUP BY hecho_pedido_sucursal, esta_pedido_nombre, tiem_cuatrimestre
 
 
 /*
@@ -88,12 +89,13 @@ y registra la factura para el mismo. Por cuatrimestre
 SELECT 
     ABS(AVG(DATEDIFF(DAY, hp.hecho_pedido_tiempo, hv.hecho_venta_tiempo))), 
     hv.hecho_venta_sucursal, 
-    tp.tiem_cuatri
+    tp.tiem_cuatrimestre
 FROM FORIF_ISTAS.HechoVenta hv
 JOIN FORIF_ISTAS.HechoPedido hp ON hv.hecho_venta_sucursal = hp.hecho_pedido_sucursal
 JOIN FORIF_ISTAS.DimTiempo tv ON hv.hecho_venta_tiempo = tv.tiem_id
-JOIN FORIF_ISTAS.DimTiempo tp ON hp.hecho_pedido_tiempo = tp.tiem_id and tv.tiem_cuatri = tp.tiem_cuatri
-GROUP BY hv.hecho_venta_sucursal, tp.tiem_cuatri
+JOIN FORIF_ISTAS.DimTiempo tp ON hp.hecho_pedido_tiempo = tp.tiem_id and tv.tiem_cuatrimestre = tp.tiem_cuatrimestre
+GROUP BY hv.hecho_venta_sucursal, tp.tiem_cuatrimestre
+go
 
 
 
@@ -179,9 +181,39 @@ ORDER BY anio, mes
 -- Utilizo el cast porque sino no me pasa a FLOAT y me da un valor entero 
 SELECT anio, mes, (CAST(suma_envios_en_forma AS FLOAT) /suma_envios_totales) * 100 AS promedio_envios_cumplidos
 FROM FORIF_ISTAS.mv_prom_envios_cumplidos
-
+go
 
 
 --- == FACU == --
 
+-- == vista 8 == --
+-- Compras por  Tipo de Material. Importe total gastado por tipo de material, sucursal y cuatrimestre
+CREATE OR ALTER VIEW FORIF_ISTAS.compras_por_tipo
+AS
+SELECT 
+    tipo_material_nombre AS TipoMaterial,
+    hecho_compra_sucursal AS Sucursal,
+    tiem_cuatrimestre AS Cuatrimestre,
+    SUM(hecho_compra_precio_material) AS ImporteTotal
+from FORIF_ISTAS.HechoCompra
+JOIN FORIF_ISTAS.DimTiempo on hecho_compra_tiempo = tiem_id
+JOIN FORIF_ISTAS.DimUbicacion on hecho_compra_ubicacion = ubic_id
+JOIN FORIF_ISTAS.DimTipoMaterial on hecho_compra_tipo_material = tipo_material_id
+GROUP BY tipo_material_nombre , ubic_localidad, tiem_cuatrimestre
+go
 
+-- == vista 10 == --
+-- localidades que pagan mayor costo de envio. Las 3 localidades (tomando la
+-- localidad del cliente) con mayor promedio de costo de envio (total).
+
+CREATE VIEW FORIF_ISTAS.mayor_costo_envio
+AS
+SELECT TOP 3
+	ubic_localidad,
+	avg(hecho_envio_cantidad_en_forma) AS promedio_Costo_Envio
+from FORIF_ISTAS.HechoEnvio
+JOIN FORIF_ISTAS.DimTiempo on hecho_envio_tiempo = tiem_id
+JOIN FORIF_ISTAS.DimUbicacion on hecho_envio_ubicacion = ubic_id
+group by ubic_localidad
+order by avg(hecho_envio_cantidad_en_forma) desc
+go
