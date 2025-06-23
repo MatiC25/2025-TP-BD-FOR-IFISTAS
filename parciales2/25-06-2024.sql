@@ -84,3 +84,56 @@ BEGIN
 
     return @cantGanadora
 END
+
+
+CREATE FUNCTION sellStreak(@prod char(8), @fecha SMALLDATETIME) 
+RETURNS INT
+AS
+BEGIN
+    DECLARE @fechaPivot SMALLDATETIME, @fechaAUX SMALLDATETIME
+    DECLARE @cant INT = 0
+    DECLARE @maxCant INT = 0
+
+    SELECT @fechaPivot = (
+        SELECT MIN(fact_fecha)
+        FROM Factura 
+        JOIN Item_Factura ON item_tipo + item_sucursal + item_numero = fact_tipo + fact_sucursal + fact_numero
+        WHERE item_producto = @prod AND fact_fecha >= @fecha
+    )
+
+    IF @fechaPivot IS NULL
+        RETURN 0
+
+    DECLARE c1 CURSOR FOR
+        SELECT DISTINCT fact_fecha
+        FROM Factura 
+        JOIN Item_Factura ON item_tipo + item_sucursal + item_numero = fact_tipo + fact_sucursal + fact_numero
+        WHERE item_producto = @prod AND fact_fecha >= @fechaPivot
+        ORDER BY 1
+
+    OPEN c1
+    FETCH NEXT FROM c1 INTO @fechaAUX
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF @fechaAUX = DATEADD(DAY, @cant, @fechaPivot)
+        BEGIN
+            SET @cant = @cant + 1
+        END
+        ELSE
+        BEGIN
+            SET @fechaPivot = @fechaAUX
+            SET @cant = 1
+        END
+
+        IF @cant > @maxCant
+            SET @maxCant = @cant
+
+        FETCH NEXT FROM c1 INTO @fechaAUX
+    END
+
+    CLOSE c1
+    DEALLOCATE c1
+
+    RETURN @maxCant
+END

@@ -592,8 +592,6 @@ del año.
 El resultado deberá ser ordenado por el total vendido por año y familia en forma
 descendente. */
 
--- Solución válida: --
-
 SELECT 
 	YEAR(f.fact_fecha),
 	p.prod_familia,

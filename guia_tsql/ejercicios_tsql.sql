@@ -186,10 +186,10 @@ BEGIN
                                         where comp_producto = @prod
         open compo
         fetch next from compo into @comp, @cantidad
-		select @precio_producto = 0
+		SET @precio_producto = 0
         while @@FETCH_STATUS = 0
         BEGIN
-            select @precio_producto = @precio_producto + @cantidad * dbo.precio_compuesto(@comp)
+            SET @precio_producto = @precio_producto + @cantidad * dbo.precio_compuesto(@comp)
             fetch next from compo into @comp, @cantidad
         END
         close compo
