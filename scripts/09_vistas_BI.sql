@@ -159,3 +159,39 @@ JOIN FORIF_ISTAS.DimUbicacion ON hecho_envio_ubicacion = ubic_id
 GROUP BY ubic_localidad
 ORDER BY AVG(hecho_envio_cantidad_en_forma) DESC
 GO
+
+
+-- Rendimiento de modelos: Los 3 modelos con mayores ventas para cada cuatrimestre de cada año según la localidad de la sucursal 
+-- y rango etario de los clientes 
+
+CREATE OR ALTER VIEW FORIF_ISTAS.VistaTopModelosPorSegmento AS
+WITH VentasConRanking AS (
+    SELECT 
+        T.tiem_año AS Año,
+        T.tiem_cuatrimestre AS Cuatrimestre,
+        U.ubic_localidad AS Localidad,
+        V.hecho_venta_rango_etario AS Rango_Etario,
+        M.mode_sillon_nombre AS Modelo,
+        SUM(V.hecho_venta_cantidad) AS TotalVentas,
+        ROW_NUMBER() OVER (
+            PARTITION BY T.tiem_año, T.tiem_cuatrimestre, U.ubic_localidad, V.hecho_venta_rango_etario
+            ORDER BY SUM(V.hecho_venta_cantidad) DESC
+        ) AS PosicionRanking
+    FROM FORIF_ISTAS.HechoVenta V
+    JOIN FORIF_ISTAS.DimModeloSillon M ON M.mode_sillon_id = V.hecho_venta_sillon_modelo
+    JOIN FORIF_ISTAS.DimTiempo T ON T.tiem_id = V.hecho_venta_tiempo
+    JOIN FORIF_ISTAS.DimUbicacion U ON U.ubic_id = V.hecho_venta_ubicacion
+    GROUP BY 
+        T.tiem_año, T.tiem_cuatrimestre, U.ubic_localidad, 
+        V.hecho_venta_rango_etario, M.mode_sillon_nombre
+)
+SELECT 
+    Año,
+    Cuatrimestre,
+    Localidad,
+    Rango_Etario,
+    Modelo
+FROM VentasConRanking
+WHERE PosicionRanking <= 3;
+
+

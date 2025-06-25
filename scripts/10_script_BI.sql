@@ -314,6 +314,7 @@ BEGIN
         ubic_id,
         COUNT(*) AS cant_facturas
     FROM FORIF_ISTAS.Factura
+    RIGHT JOIN FORIF_ISTAS.DimTiempo ON tiem_año = YEAR(fact_fecha_hora) AND tiem_mes = MONTH(fact_fecha_hora)
     JOIN FORIF_ISTAS.Item_Factura ON item_f_numero_factura = fact_numero
     JOIN FORIF_ISTAS.Sillon ON item_f_sillon = sill_codigo
     JOIN FORIF_ISTAS.Modelo ON mode_code = sill_modelo
@@ -323,7 +324,6 @@ BEGIN
     JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
     JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
     JOIN FORIF_ISTAS.DimUbicacion ON ubic_provincia = prov_nombre AND ubic_localidad = loca_nombre
-    JOIN FORIF_ISTAS.DimTiempo ON tiem_año = YEAR(fact_fecha_hora) AND tiem_mes = MONTH(fact_fecha_hora)
     JOIN FORIF_ISTAS.DimRangoEtario ON rang_etario_inicio <= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora) AND rang_etario_fin >= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora)
     JOIN FORIF_ISTAS.DimModeloSillon ON mode_sillon_nombre = mode_descripcion
     GROUP BY rang_etario_id,
