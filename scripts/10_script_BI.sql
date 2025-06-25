@@ -30,8 +30,9 @@ IF OBJECT_ID('FORIF_ISTAS.Migracion_DimTiempo') IS NOT NULL DROP PROCEDURE FORIF
 
 CREATE TABLE FORIF_ISTAS.DimTiempo (
     tiem_id INT IDENTITY(1,1), --PRIMARY KEY,
-    tiem_fecha DATETIME2 NOT NULL,
-    tiem_cuatrimestre INT NOT NULL
+    tiem_mes INT NOT NULL,
+    tiem_cuatrimestre INT NOT NULL,
+    tiem_año INT NOT NULL
 )
 GO
 ALTER TABLE FORIF_ISTAS.DimTiempo ADD CONSTRAINT PK_DimTiempo PRIMARY KEY (tiem_id);
@@ -41,11 +42,12 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    INSERT INTO FORIF_ISTAS.DimTiempo (tiem_fecha, tiem_cuatrimestre)
+    INSERT INTO FORIF_ISTAS.DimTiempo (tiem_mes, tiem_cuatrimestre, tiem_año)
 
     SELECT DISTINCT
-        fact_fecha_hora,
-        DATEPART(QUARTER, fact_fecha_hora)
+        DATEPART(MONTH, fact_fecha_hora),
+        ((MONTH(fact_fecha_hora) - 1) / 4) + 1,
+        DATEPART(YEAR, fact_fecha_hora)
     
     FROM FORIF_ISTAS.Factura
     WHERE fact_fecha_hora IS NOT NULL
@@ -53,8 +55,9 @@ BEGIN
     UNION
 
     SELECT DISTINCT 
-        pedi_fecha_hora,
-        DATEPART(QUARTER, pedi_fecha_hora)
+        DATEPART(MONTH, pedi_fecha_hora),
+        ((MONTH(pedi_fecha_hora) - 1) / 4) + 1,
+        DATEPART(YEAR, pedi_fecha_hora)
     
     FROM FORIF_ISTAS.Pedido
     WHERE pedi_fecha_hora IS NOT NULL
@@ -62,24 +65,27 @@ BEGIN
     UNION
     
     SELECT DISTINCT
-        envi_fecha_programada,
-        DATEPART(QUARTER, envi_fecha_programada)
+        DATEPART(MONTH, envi_fecha_programada),
+        ((MONTH(envi_fecha_programada) - 1) / 4) + 1,
+        DATEPART(YEAR, envi_fecha_programada)
     FROM FORIF_ISTAS.Envio
     WHERE envi_fecha_programada IS NOT NULL
 
     UNION
     
     SELECT DISTINCT
-        envi_fecha_entrega,
-        DATEPART(QUARTER, envi_fecha_entrega)
+        DATEPART(MONTH, envi_fecha_entrega),
+        ((MONTH(envi_fecha_entrega) - 1) / 4) + 1,
+        DATEPART(YEAR, envi_fecha_entrega)
     FROM FORIF_ISTAS.Envio
     WHERE envi_fecha_entrega IS NOT NULL
 
     UNION
     
     SELECT DISTINCT
-        comp_fecha,
-        DATEPART(QUARTER, comp_fecha)
+        DATEPART(MONTH, comp_fecha),
+        ((MONTH(comp_fecha) - 1) / 4) + 1,
+        DATEPART(YEAR, comp_fecha)
     FROM FORIF_ISTAS.Compra
     WHERE comp_fecha IS NOT NULL;
         
@@ -272,7 +278,6 @@ GO
 
 CREATE TABLE FORIF_ISTAS.HechoVenta (
     hecho_venta_cantidad INT NOT NULL,
-    hecho_venta_sucursal INT NOT NULL, 
     hecho_venta_sillon_modelo INT NOT NULL, -- FOREIGN KEY REFERENCES DimModeloSillon(mode_sillon_id)
     hecho_venta_total DECIMAL(10, 2) NOT NULL,
     hecho_venta_tiempo INT NOT NULL, -- FOREIGN KEY REFERENCES DimTiempo(tiem_id)
@@ -285,8 +290,6 @@ ALTER TABLE FORIF_ISTAS.HechoVenta ADD CONSTRAINT FK_hecho_venta_rango_estario F
 GO
 ALTER TABLE FORIF_ISTAS.HechoVenta ADD CONSTRAINT FK_hecho_venta_tiempo FOREIGN KEY (hecho_venta_tiempo) REFERENCES FORIF_ISTAS.DimTiempo (tiem_id)
 GO
-ALTER TABLE FORIF_ISTAS.HechoVenta ADD CONSTRAINT FK_hecho_venta_sucursal FOREIGN KEY (hecho_venta_ubicacion) REFERENCES FORIF_ISTAS.DimUbicacion (ubic_id)
-GO
 ALTER TABLE FORIF_ISTAS.HechoVenta ADD CONSTRAINT FK_hecho_venta_sillon_modelo FOREIGN KEY (hecho_venta_sillon_modelo) REFERENCES FORIF_ISTAS.DimModeloSillon (mode_sillon_id)
 GO
 
@@ -298,7 +301,6 @@ BEGIN
     INSERT INTO FORIF_ISTAS.HechoVenta (
         hecho_venta_rango_etario,
         hecho_venta_tiempo,
-        hecho_venta_sucursal,
         hecho_venta_sillon_modelo,
         hecho_venta_total,
         hecho_venta_ubicacion,
@@ -307,7 +309,6 @@ BEGIN
         SELECT
         rang_etario_id,
         tiem_id,
-        fact_sucursal, 
         mode_sillon_id, 
         SUM(ISNULL(fact_total, 0)) AS total_factura,
         ubic_id,
@@ -317,16 +318,16 @@ BEGIN
     JOIN FORIF_ISTAS.Sillon ON item_f_sillon = sill_codigo
     JOIN FORIF_ISTAS.Modelo ON mode_code = sill_modelo
     JOIN FORIF_ISTAS.Cliente ON fact_cliente = clie_codigo
-    JOIN FORIF_ISTAS.Direccion ON clie_direccion = dire_codigo
+    JOIN FORIF_ISTAS.Sucursal ON sucu_numero = fact_sucursal
+    JOIN FORIF_ISTAS.Direccion ON sucu_direccion = dire_codigo
     JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
     JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
     JOIN FORIF_ISTAS.DimUbicacion ON ubic_provincia = prov_nombre AND ubic_localidad = loca_nombre
-    JOIN FORIF_ISTAS.DimTiempo ON tiem_fecha = fact_fecha_hora
+    JOIN FORIF_ISTAS.DimTiempo ON tiem_año = YEAR(fact_fecha_hora) AND tiem_mes = MONTH(fact_fecha_hora)
     JOIN FORIF_ISTAS.DimRangoEtario ON rang_etario_inicio <= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora) AND rang_etario_fin >= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora)
     JOIN FORIF_ISTAS.DimModeloSillon ON mode_sillon_nombre = mode_descripcion
     GROUP BY rang_etario_id,
              tiem_id,
-             fact_sucursal, 
              mode_sillon_id, 
              ubic_id
 
@@ -343,7 +344,6 @@ CREATE TABLE FORIF_ISTAS.HechoCompra (
     hecho_compra_tiempo INT NOT NULL, -- FOREIGN KEY REFERENCES DimTiempo(tiem_id)
     hecho_compra_ubicacion INT NOT NULL,
     hecho_compra_tipo_material INT NOT NULL, -- FOREIGN KEY REFERENCES DimTipoMaterial(tipo_material_id)
-    hecho_compra_sucursal INT NOT NULL,
     hecho_compra_precio_material DECIMAL(10, 2) NOT NULL,
 )
 GO
@@ -351,8 +351,6 @@ GO
 ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_tiempo FOREIGN KEY (hecho_compra_tiempo) REFERENCES FORIF_ISTAS.DimTiempo
 GO
 ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_ubicacion FOREIGN KEY (hecho_compra_ubicacion) REFERENCES FORIF_ISTAS.DimUbicacion
-GO
-ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_sucursal FOREIGN KEY (hecho_compra_sucursal) REFERENCES FORIF_ISTAS.DimUbicacion
 GO
 ALTER TABLE FORIF_ISTAS.HechoCompra ADD CONSTRAINT FK_hecho_compra_tipo_material FOREIGN KEY (hecho_compra_tipo_material) REFERENCES FORIF_ISTAS.DimTipoMaterial
 GO
@@ -366,7 +364,6 @@ BEGIN
         hecho_compra_tiempo,
         hecho_compra_ubicacion,
         hecho_compra_tipo_material,
-        hecho_compra_sucursal,
         hecho_compra_precio_material
     )
     
@@ -374,7 +371,6 @@ BEGIN
         tiem_id,
         ubic_id,
         tipo_material_id,
-        comp_sucursal,
         mate_precio
     FROM FORIF_ISTAS.Compra
     JOIN FORIF_ISTAS.Sucursal ON comp_sucursal = sucu_numero
@@ -384,7 +380,7 @@ BEGIN
     JOIN FORIF_ISTAS.DimUbicacion ON ubic_localidad = loca_nombre AND ubic_provincia = prov_nombre
     JOIN FORIF_ISTAS.Item_Compra ON comp_numero = item_c_numero
     JOIN FORIF_ISTAS.Material ON item_c_material = mate_codigo
-    JOIN FORIF_ISTAS.DimTiempo ON tiem_fecha = comp_fecha
+    JOIN FORIF_ISTAS.DimTiempo ON tiem_año = YEAR(comp_fecha) AND tiem_mes = MONTH(comp_fecha)
     JOIN FORIF_ISTAS.DimTipoMaterial ON tipo_material_nombre = mate_tipo
 
 END
@@ -432,7 +428,8 @@ BEGIN
         JOIN FORIF_ISTAS.Direccion ON clie_direccion =  dire_codigo
         JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
         JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
-        JOIN FORIF_ISTAS.DimTiempo ON tiem_fecha = envi_fecha_programada OR tiem_fecha = envi_fecha_entrega
+        JOIN FORIF_ISTAS.DimTiempo ON tiem_año = year(envi_fecha_programada) AND tiem_mes = month(envi_fecha_programada) 
+                                    OR tiem_año = year(envi_fecha_entrega) AND tiem_mes = month(envi_fecha_entrega) 
         JOIN FORIF_ISTAS.DimUbicacion ON ubic_provincia = prov_nombre AND ubic_localidad = loca_nombre
         WHERE envi_fecha_entrega <= envi_fecha_programada AND tiem_id = t.tiem_id AND ubic_id = u.ubic_id
         GROUP BY tiem_id, ubic_id), 0) as cantEnForma
@@ -442,9 +439,10 @@ BEGIN
     JOIN FORIF_ISTAS.Direccion ON clie_direccion =  dire_codigo
     JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
     JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
-    JOIN FORIF_ISTAS.DimTiempo t ON t.tiem_fecha = envi_fecha_programada OR t.tiem_fecha = envi_fecha_entrega
+    JOIN FORIF_ISTAS.DimTiempo t ON (t.tiem_año = YEAR(envi_fecha_programada) AND t.tiem_mes = MONTH(envi_fecha_programada)) 
+        OR (t.tiem_año = YEAR(envi_fecha_entrega) AND t.tiem_mes = MONTH(envi_fecha_entrega))
     JOIN FORIF_ISTAS.DimUbicacion u ON u.ubic_provincia = prov_nombre AND u.ubic_localidad = loca_nombre
-    GROUP BY t.tiem_id, u.ubic_id, clie_direccion
+    GROUP BY t.tiem_id, u.ubic_id
 END
 GO 
 EXEC FORIF_ISTAS.Migracion_HechoEnvio
@@ -456,7 +454,6 @@ CREATE TABLE FORIF_ISTAS.HechoPedido (
     hecho_pedido_estado INT NOT NULL, -- FOREIGN KEY REFERENCES DimEstadoPedido(esta_pedido_id)
     hecho_pedido_tiempo INT NOT NULL, -- FOREIGN KEY REFERENCES DimTiempo(tiem_id)
     hecho_pedido_turno INT NOT NULL, -- FOREIGN KEY REFERENCES DimTurnoVentas(turn_id)
-    hecho_pedido_sucursal INT NOT NULL,
     hecho_pedido_cantidad INT NOT NULL
 )
 GO
@@ -475,23 +472,20 @@ BEGIN
 
     INSERT INTO FORIF_ISTAS.HechoPedido (
         hecho_pedido_estado,
-        hecho_pedido_sucursal,
         hecho_pedido_turno,
         hecho_pedido_tiempo,
         hecho_pedido_cantidad
     )
     SELECT DISTINCT 
         esta_pedido_id,
-        pedi_sucursal,
         turn_id,
         tiem_id,    
-        COUNT(*)
+        COUNT(*) as cantidad
     FROM FORIF_ISTAS.Pedido
     JOIN FORIF_ISTAS.DimTurnoVentas ON CAST(pedi_fecha_hora AS TIME) >= turn_hora_inicio AND CAST(pedi_fecha_hora AS TIME) <= turn_hora_fin
     JOIN FORIF_ISTAS.DimEstadoPedido ON pedi_estado = esta_pedido_nombre
-    JOIN FORIF_ISTAS.DimTiempo ON pedi_fecha_hora = tiem_fecha
+    JOIN FORIF_ISTAS.DimTiempo ON year(pedi_fecha_hora) = tiem_año and month(pedi_fecha_hora) = tiem_mes
     GROUP BY esta_pedido_id,
-             pedi_sucursal,
              turn_id,
              tiem_id
 END

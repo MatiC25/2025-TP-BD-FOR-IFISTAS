@@ -2,36 +2,36 @@
 -- -- == Vista Ganancias == --
 CREATE VIEW FORIF_ISTAS.Ganancias
 AS
-SELECT MONTH(T.tiem_fecha) AS Mes,
-       V.hecho_venta_sucursal AS Sucursal,
-       SUM(V.hecho_venta_total) AS Total_Ventas,
-	   SUM(ISNULL(C.hecho_compra_precio_material, 0)) AS Total_Costos
+SELECT T.tiem_mes AS Mes,
+       V.hecho_venta_ubicacion AS Direccion_Sucursal,
+       SUM(V.hecho_venta_total) - SUM(ISNULL(C.hecho_compra_precio_material, 0)) AS Total_Ganancia
 FROM FORIF_ISTAS.HechoVenta V
-JOIN FORIF_ISTAS.DimTiempo T ON V.hecho_venta_tiempo = T.tiem_id
-LEFT JOIN FORIF_ISTAS.HechoCompra C ON V.hecho_venta_sucursal = C.hecho_compra_sucursal 
-	AND MONTH(V.hecho_venta_tiempo) = MONTH(C.hecho_compra_tiempo)
-GROUP BY MONTH(T.tiem_fecha),
-         V.hecho_venta_sucursal
+LEFT JOIN FORIF_ISTAS.HechoCompra C ON V.hecho_venta_ubicacion = C.hecho_compra_ubicacion
+LEFT JOIN FORIF_ISTAS.DimTiempo T ON V.hecho_venta_tiempo = T.tiem_id
+LEFT JOIN FORIF_ISTAS.DimTiempo T2 ON C.hecho_compra_tiempo = T2.tiem_id
+LEFT JOIN FORIF_ISTAS.DimUbicacion U ON V.hecho_venta_ubicacion = U.ubic_id 
+	AND T.tiem_mes = T2.tiem_mes
+GROUP BY T.tiem_mes, V.hecho_venta_ubicacion
 GO
 
 -- -- == Vista Facturación Promedio Mensual == --
 CREATE VIEW FORIF_ISTAS.Factura_Promedio
 AS
-SELECT YEAR(T.tiem_fecha) AS Año,
+SELECT tiem_año AS Año,
 	   T.tiem_cuatrimestre AS Cuatrimestre, 
-	   U.ubic_localidad AS Localidad,
-	   SUM(V.hecho_venta_total) / V.hecho_venta_cantidad AS Promedio
+	   U.ubic_provincia AS Provincia,
+	   SUM(V.hecho_venta_total) / SUM(V.hecho_venta_cantidad) AS Promedio
 FROM FORIF_ISTAS.HechoVenta V
 JOIN FORIF_ISTAS.DimUbicacion U ON U.ubic_id = V.hecho_venta_ubicacion
 JOIN FORIF_ISTAS.DimTiempo T ON T.tiem_id = V.hecho_venta_tiempo
-GROUP BY T.tiem_cuatrimestre, YEAR(T.tiem_fecha), U.ubic_localidad, V.hecho_venta_cantidad
+GROUP BY T.tiem_cuatrimestre, tiem_año, U.ubic_provincia
 go
 
 -- -- == Vista Rendimiento de Modelos == --
 CREATE VIEW FORIF_ISTAS.Rendimiento_Modelos
 AS
 SELECT T.tiem_cuatrimestre AS Cuatrimestre, 
-	   YEAR(T.tiem_fecha) AS Año, 
+	   T.tiem_año AS Año, 
 	   U.ubic_localidad AS Localidad,  
 	   v.hecho_venta_rango_etario AS Rango_Etario,
 	   M.mode_sillon_nombre AS Modelo
@@ -39,12 +39,14 @@ FROM FORIF_ISTAS.HechoVenta V
 JOIN FORIF_ISTAS.DimModeloSillon M ON M.mode_sillon_id = V.hecho_venta_sillon_modelo
 JOIN FORIF_ISTAS.DimTiempo T ON T.tiem_id = V.hecho_venta_tiempo
 JOIN FORIF_ISTAS.DimUbicacion U ON U.ubic_id = V.hecho_venta_ubicacion
-WHERE M.mode_sillon_id IN (SELECT TOP 3 hecho_venta_sillon_modelo
+WHERE M.mode_sillon_id IN (SELECT TOP 3 V2.hecho_venta_sillon_modelo
 						   FROM FORIF_ISTAS.HechoVenta V2
-						   WHERE V2.hecho_venta_tiempo = t.tiem_id AND V2.hecho_venta_ubicacion = V.hecho_venta_ubicacion
-						   GROUP BY hecho_venta_sillon_modelo
-						   ORDER BY SUM(hecho_venta_cantidad) DESC)
-GROUP BY T.tiem_cuatrimestre, YEAR(T.tiem_fecha), U.ubic_localidad, v.hecho_venta_rango_etario, M.mode_sillon_nombre
+						   WHERE V2.hecho_venta_rango_etario = V.hecho_venta_rango_etario
+								AND V2.hecho_venta_tiempo = V.hecho_venta_tiempo 
+								AND V2.hecho_venta_ubicacion = V.hecho_venta_ubicacion
+						   GROUP BY V2.hecho_venta_sillon_modelo
+						   ORDER BY SUM(V2.hecho_venta_cantidad) DESC)
+GROUP BY T.tiem_cuatrimestre, T.tiem_año, U.ubic_localidad, v.hecho_venta_rango_etario, M.mode_sillon_nombre
 GO
 
 --- == MATI == -- 
@@ -87,7 +89,7 @@ y registra la factura para el mismo. Por cuatrimestre
 */
 
 SELECT 
-    ABS(AVG(DATEDIFF(DAY, hp.hecho_pedido_tiempo, hv.hecho_venta_tiempo))), 
+    AVG(DATEDIFF(DAY, hp.hecho_pedido_tiempo, hv.hecho_venta_tiempo)), 
     hv.hecho_venta_sucursal, 
     tp.tiem_cuatrimestre
 FROM FORIF_ISTAS.HechoVenta hv
@@ -95,35 +97,21 @@ JOIN FORIF_ISTAS.HechoPedido hp ON hv.hecho_venta_sucursal = hp.hecho_pedido_suc
 JOIN FORIF_ISTAS.DimTiempo tv ON hv.hecho_venta_tiempo = tv.tiem_id
 JOIN FORIF_ISTAS.DimTiempo tp ON hp.hecho_pedido_tiempo = tp.tiem_id and tv.tiem_cuatrimestre = tp.tiem_cuatrimestre
 GROUP BY hv.hecho_venta_sucursal, tp.tiem_cuatrimestre
-go
 
+GO
 
 
 --- == NICO == -- 
-
--- == vista 7 == --
+ -- == vista 7 == --
 -- Promedio de Compras: importe promedio de compras por mes
-CREATE OR ALTER VIEW FORIF_ISTAS.mv_prom_compras_mes
-(  
-	anio, 
-    mes, 
-    suma_precio,
-    cantidad
-)
-WITH SCHEMABINDING
-AS
+CREATE OR ALTER VIEW FORIF_ISTAS.vw_promedio_compras_mes AS
 SELECT 
-    YEAR(tiem_fecha) AS anio,
-    MONTH(tiem_fecha) AS mes,
-    SUM(hecho_compra_precio_material) AS suma_precio,
-    COUNT_BIG(*) AS cantidad
+    tiem_año AS anio,
+    tiem_mes AS mes,
+    SUM(hecho_compra_precio_material)  / COUNT(*) AS promedio_precio
 FROM FORIF_ISTAS.HechoCompra
-JOIN FORIF_ISTAS.DimTiempo ON FORIF_ISTAS.HechoCompra.hecho_compra_tiempo = FORIF_ISTAS.DimTiempo.tiem_id
-GROUP BY YEAR(tiem_fecha), MONTH(tiem_fecha)
-GO
-
-CREATE UNIQUE CLUSTERED INDEX IX_mv_prom_compras_mes
-ON FORIF_ISTAS.mv_prom_compras_mes (anio, mes)
+JOIN FORIF_ISTAS.DimTiempo ON HechoCompra.hecho_compra_tiempo = DimTiempo.tiem_id
+GROUP BY tiem_año, tiem_mes
 GO
 
 
@@ -132,56 +120,22 @@ GO
 -- Porcentaje de los cumplimientos de envios en los tiempos programados por mes 
 -- Se calcula teniendo en cuenta los envios cumplidos en fecha sobnre el total de envios para el periodo
 
-CREATE OR ALTER VIEW FORIF_ISTAS.mv_prom_envios_cumplidos
-(
-    anio,
-    mes,
-    suma_envios_totales,
-    suma_envios_en_forma
-)
-WITH SCHEMABINDING
-AS
+CREATE OR ALTER VIEW FORIF_ISTAS.vw_porcentaje_envios_cumplidos AS
 SELECT 
-    YEAR(tiem_fecha) AS anio,
-    MONTH(tiem_fecha) AS mes,
-    COUNT_BIG(*) AS suma_envios_totales,
-    SUM(hecho_envio_cantidad_en_forma) AS suma_envios_en_forma
+    tiem_año AS anio,
+    tiem_mes AS mes,
+    CAST(SUM(hecho_envio_cantidad_en_forma) AS FLOAT)/ CAST(SUM(hecho_envio_cantidad_total) AS FLOAT) * 100 AS porcentaje_cumplidos
 FROM FORIF_ISTAS.HechoEnvio
-JOIN FORIF_ISTAS.DimTiempo 
-    ON FORIF_ISTAS.HechoEnvio.hecho_envio_tiempo = FORIF_ISTAS.DimTiempo.tiem_id
-GROUP BY YEAR(tiem_fecha), MONTH(tiem_fecha)
-GO
-
-
-CREATE UNIQUE CLUSTERED INDEX IX_mv_prom_envios_cumplidos
-ON FORIF_ISTAS.mv_prom_envios_cumplidos (anio, mes)
+JOIN FORIF_ISTAS.DimTiempo ON HechoEnvio.hecho_envio_tiempo = DimTiempo.tiem_id
+GROUP BY tiem_año, tiem_mes
 GO
 
 
 -- == PRUEBAS == --
 -- PRUEBAS DE LAS VISTAS
 -- Prueba de la vista
-SELECT anio, mes, suma_precio /cantidad as promedio_de_compras
-FROM FORIF_ISTAS.mv_prom_compras_mes
-
--- select que la contrasta
--- Prueba de porcetajes de compras por mes (DA IGUAL) 
-SELECT 
-    YEAR(tiem_fecha) AS anio,
-    MONTH(tiem_fecha) AS mes,
-    SUM(hecho_compra_precio_material) AS suma_precio,
-    COUNT_BIG(*) AS cantidad,
-    AVG(CAST(hecho_compra_precio_material AS FLOAT)) AS promedio_precio_directo
-FROM FORIF_ISTAS.HechoCompra
-JOIN FORIF_ISTAS.DimTiempo ON FORIF_ISTAS.HechoCompra.hecho_compra_tiempo = FORIF_ISTAS.DimTiempo.tiem_id
-GROUP BY YEAR(tiem_fecha), MONTH(tiem_fecha)
-ORDER BY anio, mes
-
-
--- Utilizo el cast porque sino no me pasa a FLOAT y me da un valor entero 
-SELECT anio, mes, (CAST(suma_envios_en_forma AS FLOAT) /suma_envios_totales) * 100 AS promedio_envios_cumplidos
-FROM FORIF_ISTAS.mv_prom_envios_cumplidos
-go
+SELECT * FROM FORIF_ISTAS.vw_porcentaje_envios_cumplidos
+SELECT * FROM FORIF_ISTAS.vw_promedio_compras_mes
 
 
 --- == FACU == --
