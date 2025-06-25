@@ -454,6 +454,7 @@ CREATE TABLE FORIF_ISTAS.HechoPedido (
     hecho_pedido_estado INT NOT NULL, -- FOREIGN KEY REFERENCES DimEstadoPedido(esta_pedido_id)
     hecho_pedido_tiempo INT NOT NULL, -- FOREIGN KEY REFERENCES DimTiempo(tiem_id)
     hecho_pedido_turno INT NOT NULL, -- FOREIGN KEY REFERENCES DimTurnoVentas(turn_id)
+    hecho_pedido_ubicacion INT NOT NULL,
     hecho_pedido_cantidad INT NOT NULL
 )
 GO
@@ -463,7 +464,8 @@ ALTER TABLE FORIF_ISTAS.HechoPedido ADD CONSTRAINT FK_hecho_pedido_tiempo FOREIG
 GO
 ALTER TABLE FORIF_ISTAS.HechoPedido ADD CONSTRAINT FK_hecho_pedido_turno FOREIGN KEY (hecho_pedido_turno) REFERENCES FORIF_ISTAS.DimTurnoVentas (turn_id)
 GO
-
+ALTER TABLE FORIF_ISTAS.HechoPedido ADD CONSTRAINT FK_hecho_pedido_ubicacion FOREIGN KEY (hecho_pedido_ubicacion) REFERENCES FORIF_ISTAS.DimUbicacion (ubic_id)
+GO
 
 CREATE PROCEDURE FORIF_ISTAS.Migracion_HechoPedido
 AS
@@ -474,20 +476,29 @@ BEGIN
         hecho_pedido_estado,
         hecho_pedido_turno,
         hecho_pedido_tiempo,
+        hecho_pedido_ubicacion,
         hecho_pedido_cantidad
     )
     SELECT DISTINCT 
         esta_pedido_id,
         turn_id,
-        tiem_id,    
+        tiem_id,
+        ubic_id,    
         COUNT(*) as cantidad
     FROM FORIF_ISTAS.Pedido
+    JOIN FORIF_ISTAS.Sucursal ON sucu_numero = pedi_sucursal
+    JOIN FORIF_ISTAS.Direccion ON dire_codigo = sucu_direccion
+    JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
+    JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
+    JOIN FORIF_ISTAS.DimUbicacion ON ubic_localidad = loca_nombre AND ubic_provincia = prov_nombre
     JOIN FORIF_ISTAS.DimTurnoVentas ON CAST(pedi_fecha_hora AS TIME) >= turn_hora_inicio AND CAST(pedi_fecha_hora AS TIME) <= turn_hora_fin
     JOIN FORIF_ISTAS.DimEstadoPedido ON pedi_estado = esta_pedido_nombre
-    JOIN FORIF_ISTAS.DimTiempo ON year(pedi_fecha_hora) = tiem_año and month(pedi_fecha_hora) = tiem_mes
+    JOIN FORIF_ISTAS.DimTiempo ON year(pedi_fecha_hora) = tiem_año AND month(pedi_fecha_hora) = tiem_mes
     GROUP BY esta_pedido_id,
              turn_id,
-             tiem_id
+             tiem_id,
+             ubic_id
+             
 END
 GO
 EXEC FORIF_ISTAS.Migracion_HechoPedido
