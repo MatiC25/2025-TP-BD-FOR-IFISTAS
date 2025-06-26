@@ -277,12 +277,13 @@ GO
 -- == Hecho Venta == --
 
 CREATE TABLE FORIF_ISTAS.HechoVenta (
-    hecho_venta_cantidad INT NOT NULL,
     hecho_venta_sillon_modelo INT NOT NULL, -- FOREIGN KEY REFERENCES DimModeloSillon(mode_sillon_id)
     hecho_venta_total DECIMAL(10, 2) NOT NULL,
     hecho_venta_tiempo INT NOT NULL, -- FOREIGN KEY REFERENCES DimTiempo(tiem_id)
     hecho_venta_ubicacion INT NOT NULL, -- FOREIGN KEY REFERENCES DimUbicacion(ubicacion_id)
-    hecho_venta_rango_etario INT NOT NULL -- FOREIGN KEY REFERENCES DimRangoEtario(rang_etario_id)
+    hecho_venta_rango_etario INT NOT NULL, -- FOREIGN KEY REFERENCES DimRangoEtario(rang_etario_id)
+    hecho_venta_tiempo_promedio INT NOT NULL,
+    hecho_venta_cantidad INT NOT NULL
 ) 
 
 GO
@@ -304,31 +305,34 @@ BEGIN
         hecho_venta_sillon_modelo,
         hecho_venta_total,
         hecho_venta_ubicacion,
-        hecho_venta_cantidad
+        hecho_venta_cantidad,
+        hecho_venta_tiempo_promedio
     )
         SELECT
-        rang_etario_id,
-        tiem_id,
-        mode_sillon_id, 
-        ISNULL(SUM(item_f_cantidad * item_f_precio), 0) AS total_factura,
-        ubic_id,
-        COUNT(*) AS cant_facturas
-    FROM FORIF_ISTAS.Factura
-    RIGHT JOIN FORIF_ISTAS.DimTiempo ON tiem_año = YEAR(fact_fecha_hora) AND tiem_mes = MONTH(fact_fecha_hora)
-    JOIN FORIF_ISTAS.Item_Factura ON item_f_numero_factura = fact_numero
-    JOIN FORIF_ISTAS.Sillon ON item_f_sillon = sill_codigo
-    JOIN FORIF_ISTAS.Modelo ON mode_code = sill_modelo
-    JOIN FORIF_ISTAS.Cliente ON fact_cliente = clie_codigo
-    JOIN FORIF_ISTAS.Sucursal ON sucu_numero = fact_sucursal
-    JOIN FORIF_ISTAS.Direccion ON sucu_direccion = dire_codigo
-    JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
-    JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
-    JOIN FORIF_ISTAS.DimUbicacion ON ubic_provincia = prov_nombre AND ubic_localidad = loca_nombre
-    JOIN FORIF_ISTAS.DimRangoEtario ON rang_etario_inicio <= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora) AND rang_etario_fin >= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora)
-    JOIN FORIF_ISTAS.DimModeloSillon ON mode_sillon_nombre = mode_descripcion
-    GROUP BY rang_etario_id,
+			rang_etario_id,
+			tiem_id,
+			mode_sillon_id, 
+			ISNULL(SUM(item_f_cantidad * item_f_precio), 0) AS total_factura,
+			ubic_id,
+			COUNT(distinct pedi_numero) AS cant_pedidos,
+			SUM(DATEDIFF(DAY, pedi_fecha_hora, fact_fecha_hora)) / COUNT(*)
+		FROM FORIF_ISTAS.Factura
+		RIGHT JOIN FORIF_ISTAS.DimTiempo ON tiem_año = YEAR(fact_fecha_hora) AND tiem_mes = MONTH(fact_fecha_hora)
+		JOIN FORIF_ISTAS.Item_Factura ON item_f_numero_factura = fact_numero
+		JOIN FORIF_ISTAS.Sillon ON item_f_sillon = sill_codigo
+		JOIN FORIF_ISTAS.Modelo ON mode_code = sill_modelo
+		JOIN FORIF_ISTAS.Cliente ON fact_cliente = clie_codigo
+		JOIN FORIF_ISTAS.Sucursal ON sucu_numero = fact_sucursal
+		JOIN FORIF_ISTAS.Direccion ON sucu_direccion = dire_codigo
+		JOIN FORIF_ISTAS.Localidad ON dire_localidad = loca_codigo
+		JOIN FORIF_ISTAS.Provincia ON loca_provincia = prov_codigo
+		JOIN FORIF_ISTAS.DimUbicacion ON ubic_provincia = prov_nombre AND ubic_localidad = loca_nombre
+		JOIN FORIF_ISTAS.DimRangoEtario ON rang_etario_inicio <= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora) AND rang_etario_fin >= DATEDIFF(YEAR, clie_fecha_nacimiento, fact_fecha_hora)
+		JOIN FORIF_ISTAS.DimModeloSillon ON mode_sillon_nombre = mode_descripcion
+		JOIN FORIF_ISTAS.pedido on pedi_numero = item_f_numero_pedido
+		GROUP BY rang_etario_id,
              tiem_id,
-             mode_sillon_id, 
+             mode_sillon_id,
              ubic_id
 
 END

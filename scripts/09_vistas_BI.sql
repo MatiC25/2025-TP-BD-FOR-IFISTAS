@@ -89,14 +89,12 @@ y registra la factura para el mismo. Por cuatrimestre
 */
 
 SELECT 
-    ABS(AVG(DATEDIFF(DAY, hp.hecho_pedido_tiempo, hv.hecho_venta_tiempo))), 
-    hv.hecho_venta_sucursal, 
-    tp.tiem_cuatrimestre
-FROM FORIF_ISTAS.HechoVenta hv
-JOIN FORIF_ISTAS.HechoPedido hp ON hv.hecho_venta_sucursal = hp.hecho_pedido_ubicacion
-JOIN FORIF_ISTAS.DimTiempo tv ON hv.hecho_venta_tiempo = tv.tiem_id
-JOIN FORIF_ISTAS.DimTiempo tp ON hp.hecho_pedido_tiempo = tp.tiem_id and tv.tiem_cuatrimestre = tp.tiem_cuatrimestre
-GROUP BY hv.hecho_venta_sucursal, tp.tiem_cuatrimestre
+    CAST(sum(hecho_venta_tiempo_promedio) AS FLOAT )/ sum(hecho_venta_cantidad) as promedio_tiempo, 
+    hecho_venta_ubicacion,
+    tiem_cuatrimestre
+FROM FORIF_ISTAS.HechoVenta
+JOIN FORIF_ISTAS.DimTiempo ON hecho_venta_tiempo = tiem_id
+GROUP BY hecho_venta_ubicacion, tiem_cuatrimestre
 GO
 
 
