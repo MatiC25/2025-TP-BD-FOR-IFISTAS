@@ -310,7 +310,7 @@ BEGIN
         rang_etario_id,
         tiem_id,
         mode_sillon_id, 
-        SUM(ISNULL(fact_total, 0)) AS total_factura,
+        ISNULL(SUM(item_f_cantidad * item_f_precio), 0) AS total_factura,
         ubic_id,
         COUNT(*) AS cant_facturas
     FROM FORIF_ISTAS.Factura
@@ -345,6 +345,7 @@ CREATE TABLE FORIF_ISTAS.HechoCompra (
     hecho_compra_ubicacion INT NOT NULL,
     hecho_compra_tipo_material INT NOT NULL, -- FOREIGN KEY REFERENCES DimTipoMaterial(tipo_material_id)
     hecho_compra_precio_material DECIMAL(10, 2) NOT NULL,
+    hecho_compra_cantidad INT
 )
 GO
 
@@ -364,14 +365,16 @@ BEGIN
         hecho_compra_tiempo,
         hecho_compra_ubicacion,
         hecho_compra_tipo_material,
-        hecho_compra_precio_material
+        hecho_compra_precio_material,
+        hecho_compra_cantidad
     )
     
     SELECT DISTINCT 
         tiem_id,
         ubic_id,
         tipo_material_id,
-        mate_precio
+        ISNULL(SUM(item_c_cantidad * item_c_precio), 0),
+        COUNT(*)
     FROM FORIF_ISTAS.Compra
     JOIN FORIF_ISTAS.Sucursal ON comp_sucursal = sucu_numero
     JOIN FORIF_ISTAS.Direccion ON dire_codigo = sucu_direccion
@@ -382,7 +385,7 @@ BEGIN
     JOIN FORIF_ISTAS.Material ON item_c_material = mate_codigo
     JOIN FORIF_ISTAS.DimTiempo ON tiem_año = YEAR(comp_fecha) AND tiem_mes = MONTH(comp_fecha)
     JOIN FORIF_ISTAS.DimTipoMaterial ON tipo_material_nombre = mate_tipo
-
+    GROUP BY tiem_id, ubic_id, tipo_material_id
 END
 GO
 EXEC FORIF_ISTAS.Migracion_HechoCompra
