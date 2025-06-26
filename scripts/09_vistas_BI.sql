@@ -106,7 +106,7 @@ GO
 CREATE OR ALTER VIEW FORIF_ISTAS.vw_promedio_compras_mes AS
 SELECT 
     tiem_mes AS mes,
-    SUM(hecho_compra_precio_material) / COUNT(*) AS promedio_precio
+    SUM(hecho_compra_precio_material) / SUM(hecho_compra_cantidad)
 FROM FORIF_ISTAS.HechoCompra
 JOIN FORIF_ISTAS.DimTiempo ON HechoCompra.hecho_compra_tiempo = DimTiempo.tiem_id
 GROUP BY tiem_mes
